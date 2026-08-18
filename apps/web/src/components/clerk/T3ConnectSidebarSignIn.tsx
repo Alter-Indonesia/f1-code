@@ -1,7 +1,8 @@
-import { UserButton, useAuth } from "@clerk/react";
+import { UserButton } from "@clerk/react";
 import { LogInIcon, ServerIcon, SmartphoneIcon } from "lucide-react";
 
 import { hasCloudPublicConfig } from "../../cloud/publicConfig";
+import { useSafeClerkAuth } from "../../cloud/useSafeClerkAuth";
 import { SidebarMenu, SidebarMenuButton, SidebarMenuItem } from "../ui/sidebar";
 import { MobileClientsUserProfilePage } from "./MobileClientsUserProfilePage";
 import { T3ConnectUserProfilePage } from "./T3ConnectUserProfilePage";
@@ -20,7 +21,7 @@ export function T3ConnectSidebarAvatar() {
 }
 
 function ConfiguredT3ConnectSidebarAvatar() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useSafeClerkAuth();
 
   if (!isLoaded || !isSignedIn) return null;
 
@@ -52,7 +53,7 @@ function ConfiguredT3ConnectSidebarAvatar() {
 }
 
 function ConfiguredT3ConnectSidebarSignIn() {
-  const { isLoaded, isSignedIn } = useAuth();
+  const { isLoaded, isSignedIn } = useSafeClerkAuth();
   const { authPrompt, openAuthPrompt } = useT3ConnectAuthPrompt();
 
   if (!isLoaded || isSignedIn) return null;

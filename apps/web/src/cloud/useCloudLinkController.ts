@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/react";
 import { findErrorTraceId } from "@t3tools/client-runtime/errors";
 import {
   isAtomCommandInterrupted,
@@ -17,6 +16,8 @@ import {
 } from "./linkEnvironmentAtoms";
 import { usePrimaryCloudLinkState } from "./primaryCloudLinkState";
 import { resolveRelayClerkTokenOptions } from "./publicConfig";
+import { readAlterSession } from "./alterSession";
+import { useSafeClerkAuth } from "./useSafeClerkAuth";
 
 export interface CloudLinkDesiredState {
   readonly managedTunnel: boolean;
@@ -33,7 +34,10 @@ export interface CloudLinkDesiredState {
  * changes, so flipping publish alone is cheap.
  */
 export function useCloudLinkController() {
-  const { getToken, isSignedIn } = useAuth();
+  const { getToken, isSignedIn: isClerkSignedIn } = useSafeClerkAuth();
+  // Alter OIDC and Clerk are independent sign-in paths (self-host runs
+  // Alter-OIDC-only) — signed in via either counts.
+  const isSignedIn = isClerkSignedIn || readAlterSession() !== null;
   const refreshRelayEnvironments = useAtomCommand(relayEnvironmentDiscovery.refresh, {
     reportFailure: false,
   });
@@ -84,7 +88,11 @@ export function useCloudLinkController() {
       reportUpdateFailure(new Error("Local environment is not ready yet."));
       return false;
     }
-    const tokenResult = await settlePromise(() => getToken(resolveRelayClerkTokenOptions()));
+    const tokenResult = await settlePromise(async () => {
+      const alterSession = readAlterSession();
+      if (alterSession) return alterSession.accessToken;
+      return getToken(resolveRelayClerkTokenOptions());
+    });
     const wantsLink = desired.managedTunnel || desired.publish;
 
     // A failure after this point may follow a partially applied mutation (e.g.

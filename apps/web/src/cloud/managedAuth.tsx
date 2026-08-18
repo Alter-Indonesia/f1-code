@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/react";
 import { ManagedRelay, setManagedRelaySession } from "@t3tools/client-runtime/relay";
 import {
   reportAtomCommandResult,
@@ -14,6 +13,7 @@ import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useAtomCommand } from "../state/use-atom-command";
 import { resolveRelayClerkTokenOptions } from "./publicConfig";
 import { readAlterSession } from "./alterSession";
+import { useSafeClerkAuth } from "./useSafeClerkAuth";
 
 let relayTokenProvider: (() => Promise<string | null>) | null = null;
 
@@ -38,7 +38,7 @@ export function activateManagedRelayAuthentication(
 }
 
 export function ManagedRelayAuthProvider({ children }: { readonly children: ReactNode }) {
-  const { getToken, isLoaded, isSignedIn, userId } = useAuth({
+  const { getToken, isLoaded, isSignedIn, userId } = useSafeClerkAuth({
     treatPendingAsSignedOut: false,
   });
   const removeRelayEnvironments = useAtomCommand(environmentCatalog.removeRelayEnvironments, {
