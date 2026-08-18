@@ -6,7 +6,7 @@
  *  - Hyperdrive→PlanetScale Postgres  -> direct `DATABASE_URL` (selfhost/db.ts)
  *  - Cloudflare Queues (APNs)         -> in-process queue (selfhost/localApnsDelivery.ts)
  *  - Alchemy KeyPair / makeRandom     -> pre-generated secrets from env (selfhost/keys.ts)
- *  - Cloudflare Tunnel/DNS bindings   -> managed-endpoint provisioning disabled (selfhost/managedEndpointDisabled.ts)
+ *  - Cloudflare Tunnel/DNS bindings   -> plain REST calls (selfhost/managedEndpointCloudflare.ts)
  *  - Worker `fetch` export            -> Node HTTP listener (HttpRouter.serve + NodeHttpServer)
  *  - Workers cron trigger             -> Effect.repeat on a fixed schedule
  *
@@ -76,7 +76,7 @@ import {
   senderLayer as localApnsSenderLayer,
   runConsumer as runLocalApnsConsumer,
 } from "./selfhost/localApnsDelivery.ts";
-import { layer as managedEndpointDisabledLayer } from "./selfhost/managedEndpointDisabled.ts";
+import { layer as managedEndpointCloudflareLayer } from "./selfhost/managedEndpointCloudflare.ts";
 import { SelfHostDeploymentConfig } from "./selfhost/deploymentConfig.ts";
 import { CloudMintKeys, ApnsDeliveryJobSigningSecret } from "./selfhost/keys.ts";
 
@@ -92,7 +92,10 @@ const relayApiLayer = Layer.mergeAll(
 
 const relayServerLayer = Layer.unwrap(
   Effect.gen(function* () {
-    const { relayPublicOrigin } = yield* SelfHostDeploymentConfig;
+    const { relayPublicOrigin, stage } = yield* SelfHostDeploymentConfig;
+    const managedEndpointBaseDomain = yield* Config.string("RELAY_TUNNEL_ZONE_NAME").pipe(
+      Config.option,
+    );
 
     const environment = yield* Config.schema(
       RelayConfiguration.ApnsEnvironment,
@@ -129,11 +132,12 @@ const relayServerLayer = Layer.unwrap(
       ...(Option.isSome(oidcJwksUri) ? { oidcJwksUri: oidcJwksUri.value } : {}),
       cloudMintPrivateKey: cloudMintKeys.privateKey,
       cloudMintPublicKey: cloudMintKeys.publicKey,
-      // Managed endpoint (per-environment auto-provisioned tunnels) is off
-      // until selfhost/managedEndpointDisabled.ts is replaced with a real
-      // Cloudflare API client — see that file.
-      managedEndpointBaseDomain: undefined,
-      managedEndpointNamespace: undefined,
+      // Managed endpoint (per-environment auto-provisioned tunnels) is only
+      // active once RELAY_TUNNEL_ZONE_NAME is set — see
+      // ManagedEndpointProvider.ts's requireCloudflareSettings, which bails
+      // gracefully with ManagedEndpointProvisioningNotConfigured otherwise.
+      managedEndpointBaseDomain: Option.getOrUndefined(managedEndpointBaseDomain),
+      managedEndpointNamespace: stage,
     });
 
     // Named separately (rather than written inline in the provideMerge
@@ -142,7 +146,7 @@ const relayServerLayer = Layer.unwrap(
     // producing incomplete inferred types that leaked as phantom missing
     // services several steps later.
     const managedEndpointProviderLive = ManagedEndpointProvider.layer.pipe(
-      Layer.provide(managedEndpointDisabledLayer),
+      Layer.provide(managedEndpointCloudflareLayer),
     );
     const apnsClientLive = ApnsClient.layer.pipe(Layer.provideMerge(ApnsProviderTokens.layer));
     const apnsDeliveryQueueLive = ApnsDeliveryQueue.layer.pipe(Layer.provide(localApnsSenderLayer));
