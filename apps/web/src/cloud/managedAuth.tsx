@@ -13,6 +13,7 @@ import { runtime } from "../lib/runtime";
 import { appAtomRegistry } from "../rpc/atomRegistry";
 import { useAtomCommand } from "../state/use-atom-command";
 import { resolveRelayClerkTokenOptions } from "./publicConfig";
+import { readAlterSession } from "./alterSession";
 
 let relayTokenProvider: (() => Promise<string | null>) | null = null;
 
@@ -48,7 +49,23 @@ export function ManagedRelayAuthProvider({ children }: { readonly children: Reac
   const accountTransitionRef = useRef<Promise<void> | null>(null);
 
   useEffect(() => {
+    const alterSession = readAlterSession();
+    if (!alterSession) return;
+    activateManagedRelayAuthentication(
+      alterSession.subject,
+      async () => readAlterSession()?.accessToken ?? null,
+    );
+    return () => deactivateManagedRelayAuthentication();
+  }, []);
+
+  useEffect(() => {
     if (!isLoaded) {
+      return;
+    }
+
+    // An Alter OIDC session is independent from Clerk and takes precedence
+    // for relay access while both providers are present during migration.
+    if (readAlterSession()) {
       return;
     }
 

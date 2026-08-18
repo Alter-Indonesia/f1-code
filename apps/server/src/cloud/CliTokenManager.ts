@@ -14,6 +14,7 @@ import * as Encoding from "effect/Encoding";
 import * as Layer from "effect/Layer";
 import * as Option from "effect/Option";
 import * as Queue from "effect/Queue";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as Semaphore from "effect/Semaphore";
 import * as Terminal from "effect/Terminal";
@@ -89,9 +90,10 @@ export const waitForLoopbackAuthorization = Effect.fn(
       while (true) {
         const result = yield* Effect.raceFirst(
           input.callback.pipe(
-            Effect.map(
-              (code): LoopbackAuthorizationResult => ({ _tag: "AuthorizationCode", code }),
-            ),
+            Effect.map((code): LoopbackAuthorizationResult => ({
+              _tag: "AuthorizationCode",
+              code,
+            })),
           ),
           readLoopbackAuthorizationAction(terminalInput),
         );
@@ -241,12 +243,16 @@ function bytesToString(value: Uint8Array): string {
 }
 
 const exchangeToken = Effect.fn("cloud.cli_token.exchange")(function* (
-  metadata: Pick<CloudCliOAuthConfig, "tokenEndpoint">,
+  metadata: Pick<CloudCliOAuthConfig, "tokenEndpoint" | "clientId" | "clientSecret">,
   params: Record<string, string>,
 ) {
   const httpClient = (yield* HttpClient.HttpClient).pipe(HttpClient.filterStatusOk);
   const response = yield* HttpClientRequest.post(metadata.tokenEndpoint).pipe(
-    HttpClientRequest.bodyUrlParams(params),
+    HttpClientRequest.bodyUrlParams({
+      ...params,
+      client_id: metadata.clientId,
+      ...(metadata.clientSecret ? { client_secret: Redacted.value(metadata.clientSecret) } : {}),
+    }),
     httpClient.execute,
     Effect.flatMap(HttpClientResponse.schemaBodyJson(OAuthTokenResponse)),
   );

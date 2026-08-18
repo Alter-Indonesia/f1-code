@@ -3,11 +3,11 @@ import {
   CONNECT_OAUTH_SCOPES,
   DEFAULT_HOSTED_APP_URL,
 } from "@t3tools/shared/connectAuth";
-import { clerkFrontendApiUrlFromPublishableKey } from "@t3tools/shared/relayAuth";
 import { normalizeSecureRelayUrl } from "@t3tools/shared/relayUrl";
 import * as Config from "effect/Config";
 import * as ConfigProvider from "effect/ConfigProvider";
 import * as Effect from "effect/Effect";
+import * as Redacted from "effect/Redacted";
 import * as Schema from "effect/Schema";
 import * as SchemaIssue from "effect/SchemaIssue";
 
@@ -150,7 +150,7 @@ function makePublicValueConfig(name: string, fallback: string) {
 }
 
 /**
- * The CLI never calls Clerk's /oauth/authorize itself: the browser leg goes
+ * The CLI never calls the OIDC authorize endpoint itself: the browser leg goes
  * through the hosted /connect page, which builds the authorize URL after a
  * Clerk session exists (see CliTokenManager.login). Only the token endpoint
  * is contacted directly.
@@ -158,50 +158,38 @@ function makePublicValueConfig(name: string, fallback: string) {
 export interface CloudCliOAuthConfig {
   readonly tokenEndpoint: string;
   readonly clientId: string;
+  readonly clientSecret?: Redacted.Redacted<string>;
   readonly loopbackPort: number;
   readonly redirectUri: string;
   readonly scopes: typeof CLOUD_CLI_OAUTH_SCOPES;
 }
 
 export function makeCloudCliOAuthConfig({
-  clerkPublishableKeyFallback = buildTimeClerkPublishableKey,
-  clerkCliOAuthClientIdFallback = buildTimeClerkCliOAuthClientId,
+  oidcIssuerFallback = process.env.ALTER_OIDC_ISSUER ?? "https://one.alterindonesia.com",
+  oidcClientIdFallback = process.env.ALTER_OIDC_CLIENT_ID ?? "",
 }: {
+  readonly oidcIssuerFallback?: string;
+  readonly oidcClientIdFallback?: string;
+  /** @deprecated retained for callers while migrating from Clerk. */
   readonly clerkPublishableKeyFallback?: string;
+  /** @deprecated retained for callers while migrating from Clerk. */
   readonly clerkCliOAuthClientIdFallback?: string;
 } = {}) {
   return Config.all({
-    clerkPublishableKey: makePublicValueConfig(
-      "T3CODE_CLERK_PUBLISHABLE_KEY",
-      clerkPublishableKeyFallback,
-    ),
-    clientId: makePublicValueConfig(
-      "T3CODE_CLERK_CLI_OAUTH_CLIENT_ID",
-      clerkCliOAuthClientIdFallback,
-    ),
+    clientId: makePublicValueConfig("ALTER_OIDC_CLIENT_ID", oidcClientIdFallback),
+    issuer: makePublicValueConfig("ALTER_OIDC_ISSUER", oidcIssuerFallback),
+    clientSecret: Config.redacted("ALTER_OIDC_CLIENT_SECRET"),
   }).pipe(
-    Config.mapOrFail(({ clerkPublishableKey, clientId }) =>
-      Effect.try({
-        try: () => clerkFrontendApiUrlFromPublishableKey(clerkPublishableKey),
-        catch: (cause) =>
-          new Config.ConfigError(
-            new ConfigProvider.SourceError({
-              message: "Failed to derive Clerk Frontend API URL from the publishable key.",
-              cause,
-            }),
-          ),
-      }).pipe(
-        Effect.map(
-          (clerkFrontendApiUrl) =>
-            ({
-              tokenEndpoint: `${clerkFrontendApiUrl}/oauth/token`,
-              clientId,
-              loopbackPort: CLOUD_CLI_OAUTH_LOOPBACK_PORT,
-              redirectUri: connectLoopbackRedirectUri(CLOUD_CLI_OAUTH_LOOPBACK_PORT),
-              scopes: CLOUD_CLI_OAUTH_SCOPES,
-            }) satisfies CloudCliOAuthConfig,
-        ),
-      ),
+    Config.map(
+      ({ issuer, clientId, clientSecret }) =>
+        ({
+          tokenEndpoint: `${issuer.replace(/\/+$/u, "")}/oidc/token`,
+          clientId,
+          clientSecret,
+          loopbackPort: CLOUD_CLI_OAUTH_LOOPBACK_PORT,
+          redirectUri: connectLoopbackRedirectUri(CLOUD_CLI_OAUTH_LOOPBACK_PORT),
+          scopes: CLOUD_CLI_OAUTH_SCOPES,
+        }) as CloudCliOAuthConfig,
     ),
   );
 }

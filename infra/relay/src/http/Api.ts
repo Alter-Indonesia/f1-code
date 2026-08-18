@@ -21,6 +21,7 @@ import * as HttpApiBuilder from "effect/unstable/httpapi/HttpApiBuilder";
 import * as HttpApiError from "effect/unstable/httpapi/HttpApiError";
 import { encodeOAuthScope } from "@t3tools/shared/oauthScope";
 import { httpHeaderRedactionLayer } from "@t3tools/shared/httpObservability";
+import { verifyOidcToken } from "@t3tools/shared/oidc";
 
 import {
   RelayApi,
@@ -1208,19 +1209,42 @@ function verifyClerkOAuthBearerToken(
   });
 }
 
+function verifyAlterOidcBearerToken(
+  config: RelayConfiguration.RelayConfiguration["Service"],
+  token: string,
+) {
+  if (!config.oidcIssuer || !config.oidcClientId) {
+    return Effect.fail(new ClerkTokenVerificationFailed({ cause: "oidc_not_configured" }));
+  }
+  return Effect.tryPromise({
+    try: () =>
+      verifyOidcToken(token, {
+        issuer: config.oidcIssuer!,
+        clientId: config.oidcClientId!,
+        ...(config.oidcJwksUri ? { jwksUri: config.oidcJwksUri } : {}),
+      }),
+    catch: (cause) => new ClerkTokenVerificationFailed({ cause }),
+  });
+}
+
 export function verifyRelayClientBearerToken(
   config: RelayConfiguration.RelayConfiguration["Service"],
   token: string,
 ) {
-  return verifyClerkBearerToken(config, token).pipe(
-    Effect.flatMap((verified) =>
-      verified.sub && hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)
-        ? Effect.succeed({ sub: verified.sub, mode: "clerk_session_bearer" as const })
-        : Effect.fail(new ClerkTokenVerificationFailed({ cause: "missing_relay_audience" })),
-    ),
+  return verifyAlterOidcBearerToken(config, token).pipe(
+    Effect.map((verified) => ({ ...verified, mode: "oidc_bearer" as const })),
     Effect.catch(() =>
-      verifyClerkOAuthBearerToken(config, token).pipe(
-        Effect.map((verified) => ({ ...verified, mode: "clerk_oauth_bearer" as const })),
+      verifyClerkBearerToken(config, token).pipe(
+        Effect.flatMap((verified) =>
+          verified.sub && hasExpectedClerkAudience(verified.aud, config.clerkJwtAudience)
+            ? Effect.succeed({ sub: verified.sub, mode: "clerk_session_bearer" as const })
+            : Effect.fail(new ClerkTokenVerificationFailed({ cause: "missing_relay_audience" })),
+        ),
+        Effect.catch(() =>
+          verifyClerkOAuthBearerToken(config, token).pipe(
+            Effect.map((verified) => ({ ...verified, mode: "clerk_oauth_bearer" as const })),
+          ),
+        ),
       ),
     ),
   );

@@ -433,7 +433,7 @@ html[data-mobile-composer-route-transition="true"]::view-transition-old(t3-mobil
 
 @layer base {
   :root {
-    /* Keep the original T3 Code artwork palettes as the defaults. Built-in
+    /* Keep the original LifeOS artwork palettes as the defaults. Built-in
        themes override them with their own pigments in the components layer. */
     --stage-art-top: oklch(0.782169 0.123386 240.226);
     --stage-art-mid: oklch(0.616111 0.195824 259.735);
@@ -1365,6 +1365,18 @@ html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="toggle"],
 html[data-theme-id] [data-workspace-titlebar-controls] [data-slot="tooltip-trigger"] {
   --control-icon-color: var(--toolbar-foreground);
   color: var(--toolbar-foreground);
+}
+
+/* Keep the main sidebar toggle on the sidebar surface in light mode instead
+   of leaving it as a bright white button. */
+[data-sidebar-control] [data-slot="sidebar-trigger"] {
+  background-color: var(--sidebar-control-surface);
+  color: var(--sidebar-foreground);
+}
+
+[data-sidebar-control] [data-slot="sidebar-trigger"]:hover,
+[data-sidebar-control] [data-slot="sidebar-trigger"][data-pressed] {
+  background-color: var(--sidebar-row-hover);
 }
 
 html[data-theme-id] [data-chat-header] [data-slot="button"]:hover,

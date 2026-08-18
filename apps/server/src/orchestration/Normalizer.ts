@@ -13,6 +13,7 @@ import {
 import { createAttachmentId, resolveAttachmentPath } from "../attachmentStore.ts";
 import { ServerConfig } from "../config.ts";
 import { parseBase64DataUrl } from "../imageMime.ts";
+import { ensureF1Gitignore } from "../workspace/F1Gitignore.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
 
 export const canonicalizeClientCommandTimestamps = (
@@ -80,12 +81,21 @@ export const normalizeDispatchCommand = (command: ClientOrchestrationCommand) =>
         );
 
     if (canonicalCommand.type === "project.create") {
+      const workspaceRoot = yield* normalizeProjectWorkspaceRootForCreate(
+        canonicalCommand.workspaceRoot,
+        canonicalCommand.createWorkspaceRootIfMissing,
+      );
+      yield* ensureF1Gitignore(workspaceRoot).pipe(
+        Effect.catchCause((cause) =>
+          Effect.logWarning("failed to add .f1/ to workspace .gitignore", {
+            workspaceRoot,
+            cause,
+          }),
+        ),
+      );
       return {
         ...canonicalCommand,
-        workspaceRoot: yield* normalizeProjectWorkspaceRootForCreate(
-          canonicalCommand.workspaceRoot,
-          canonicalCommand.createWorkspaceRootIfMissing,
-        ),
+        workspaceRoot,
         createWorkspaceRootIfMissing: canonicalCommand.createWorkspaceRootIfMissing === true,
       } satisfies OrchestrationCommand;
     }

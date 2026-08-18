@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 141 118" width="141" height="118">
+  <!-- Background -->
+  <rect width="141" height="118" fill="#040404" />
+  
+  <!-- F1 Logo -->
+  <g fill="#E8E7DF">
+    <!-- Huruf F -->
+    <path d="M 6 7 H 85 V 25 H 29 V 54 H 78 V 73 H 29 V 111 H 6 Z" />
+    
+    <!-- Angka 1 -->
+    <path d="M 91 7 H 135 V 111 H 112 V 25 H 91 Z" />
+  </g>
+</svg>

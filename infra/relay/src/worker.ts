@@ -6,6 +6,8 @@ import * as DateTime from "effect/DateTime";
 import * as Crypto from "effect/Crypto";
 import * as Effect from "effect/Effect";
 import * as Layer from "effect/Layer";
+import * as Option from "effect/Option";
+import * as Redacted from "effect/Redacted";
 import * as Stream from "effect/Stream";
 import * as Etag from "effect/unstable/http/Etag";
 import * as HttpPlatform from "effect/unstable/http/HttpPlatform";
@@ -141,9 +143,20 @@ export const ApiLive = Api.make(
     const axiomIngestToken = yield* observability.workerIngestToken.token;
     const axiomTracesEndpoint = yield* observability.traces.otelTracesEndpoint;
 
-    const clerkSecretKey = yield* Config.redacted("CLERK_SECRET_KEY");
-    const clerkPublishableKey = yield* Config.string("CLERK_PUBLISHABLE_KEY");
-    const clerkJwtAudience = yield* Config.string("CLERK_JWT_AUDIENCE");
+    // Clerk is retained as an optional compatibility path while Alter OIDC
+    // is the primary relay authentication provider.
+    const clerkSecretKey = yield* Config.redacted("CLERK_SECRET_KEY").pipe(
+      Config.withDefault(Redacted.make("")),
+    );
+    const clerkPublishableKey = yield* Config.string("CLERK_PUBLISHABLE_KEY").pipe(
+      Config.withDefault(""),
+    );
+    const clerkJwtAudience = yield* Config.string("CLERK_JWT_AUDIENCE").pipe(
+      Config.withDefault(""),
+    );
+    const oidcIssuer = yield* Config.string("ALTER_OIDC_ISSUER").pipe(Config.option);
+    const oidcClientId = yield* Config.string("ALTER_OIDC_CLIENT_ID").pipe(Config.option);
+    const oidcJwksUri = yield* Config.string("ALTER_OIDC_JWKS_URI").pipe(Config.option);
 
     const cloudMintPrivateKey = yield* cloudMintKeyPair.privateKey;
     const cloudMintPublicKey = yield* cloudMintKeyPair.publicKey;
@@ -175,6 +188,9 @@ export const ApiLive = Api.make(
         clerkSecretKey,
         clerkPublishableKey,
         clerkJwtAudience,
+        ...(Option.isSome(oidcIssuer) ? { oidcIssuer: oidcIssuer.value } : {}),
+        ...(Option.isSome(oidcClientId) ? { oidcClientId: oidcClientId.value } : {}),
+        ...(Option.isSome(oidcJwksUri) ? { oidcJwksUri: oidcJwksUri.value } : {}),
         cloudMintPrivateKey: yield* cloudMintPrivateKey,
         cloudMintPublicKey: yield* cloudMintPublicKey,
         managedEndpointBaseDomain: yield* managedEndpointZoneName,

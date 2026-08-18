@@ -5,6 +5,9 @@ import * as NodeURL from "node:url";
 import * as NodeUtil from "node:util";
 
 export interface T3CodePublicConfig {
+  readonly alterOidcIssuer: string | undefined;
+  readonly alterOidcClientId: string | undefined;
+  readonly alterOidcRedirectUri: string | undefined;
   readonly clerkPublishableKey: string | undefined;
   readonly clerkJwtTemplate: string | undefined;
   readonly clerkCliOAuthClientId: string | undefined;
@@ -43,6 +46,24 @@ export function loadRepoEnv({
           T3CODE_CLERK_PUBLISHABLE_KEY: config.clerkPublishableKey,
           VITE_CLERK_PUBLISHABLE_KEY: config.clerkPublishableKey,
           EXPO_PUBLIC_CLERK_PUBLISHABLE_KEY: config.clerkPublishableKey,
+        }
+      : {}),
+    ...(config.alterOidcIssuer
+      ? {
+          ALTER_OIDC_ISSUER: config.alterOidcIssuer,
+          VITE_ALTER_OIDC_ISSUER: config.alterOidcIssuer,
+        }
+      : {}),
+    ...(config.alterOidcClientId
+      ? {
+          ALTER_OIDC_CLIENT_ID: config.alterOidcClientId,
+          VITE_ALTER_OIDC_CLIENT_ID: config.alterOidcClientId,
+        }
+      : {}),
+    ...(config.alterOidcRedirectUri
+      ? {
+          ALTER_OIDC_REDIRECT_URI: config.alterOidcRedirectUri,
+          VITE_ALTER_OIDC_REDIRECT_URI: config.alterOidcRedirectUri,
         }
       : {}),
     ...(config.clerkJwtTemplate
@@ -105,6 +126,13 @@ export function loadRepoEnv({
 
 export function resolvePublicConfig(...sources: readonly Environment[]): T3CodePublicConfig {
   return {
+    alterOidcIssuer: firstNonEmpty(sources, "ALTER_OIDC_ISSUER", "VITE_ALTER_OIDC_ISSUER"),
+    alterOidcClientId: firstNonEmpty(sources, "ALTER_OIDC_CLIENT_ID", "VITE_ALTER_OIDC_CLIENT_ID"),
+    alterOidcRedirectUri: firstNonEmpty(
+      sources,
+      "ALTER_OIDC_REDIRECT_URI",
+      "VITE_ALTER_OIDC_REDIRECT_URI",
+    ),
     clerkPublishableKey: firstNonEmpty(
       sources,
       "T3CODE_CLERK_PUBLISHABLE_KEY",

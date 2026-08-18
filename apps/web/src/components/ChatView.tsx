@@ -75,6 +75,7 @@ import { AsyncResult } from "effect/unstable/reactivity";
 import { isElectron } from "../env";
 import { readLocalApi } from "../localApi";
 import { useDiffPanelStore } from "../diffPanelStore";
+import { CicdPanel } from "./cicd/CicdPanel";
 import {
   collapseExpandedComposerCursor,
   parseStandaloneComposerSlashCommand,
@@ -151,6 +152,15 @@ import { PullRequestDetailPanel } from "./pullRequest/PullRequestDetailPanel";
 import { PullRequestDetailGhost } from "./pullRequest/PullRequestGhosts";
 import { PullRequestsUnavailableState } from "./pullRequest/PullRequestsUnavailableState";
 import { RightPanelTabs, type PullRequestTabStatus } from "./RightPanelTabs";
+import { NotionPagePanel } from "./notion/NotionPagePanel";
+import { ClickUpPagePanel } from "./clickup/ClickUpPagePanel";
+import { DocumentationPanel } from "./documentation/DocumentationPanel";
+import {
+  DedicatedPagePanel,
+  readDedicatedPageConfig,
+  type DedicatedPageTemplate,
+} from "./dedicated/DedicatedPagePanel";
+import { IssueListPanel } from "./issue/IssueListPanel";
 import { AgentsPanel } from "./AgentsPanel";
 import {
   deriveAgentPanelModel,
@@ -3295,10 +3305,50 @@ function ChatViewContent(props: ChatViewProps) {
     if (!activeThreadRef || !activeProject) return;
     useRightPanelStore.getState().open(activeThreadRef, "files");
   }, [activeProject, activeThreadRef]);
+  const addDocumentationSurface = useCallback(() => {
+    if (!activeThreadRef || !activeProject) return;
+    useRightPanelStore.getState().open(activeThreadRef, "documentation");
+  }, [activeProject, activeThreadRef]);
+  const addCicdSurface = useCallback(() => {
+    if (!activeThreadRef || !activeProject) return;
+    useRightPanelStore.getState().open(activeThreadRef, "cicd");
+  }, [activeProject, activeThreadRef]);
   const addAgentsSurface = useCallback(() => {
     if (!activeThreadRef) return;
     useRightPanelStore.getState().open(activeThreadRef, "agents");
   }, [activeThreadRef]);
+  const [dedicatedPageTemplate, setDedicatedPageTemplate] = useState<
+    DedicatedPageTemplate | undefined
+  >();
+  const addNotionSurface = useCallback(
+    (template?: DedicatedPageTemplate) => {
+      if (!activeThreadRef || !activeProject) return;
+      setDedicatedPageTemplate(template);
+      useRightPanelStore.getState().open(activeThreadRef, "notion");
+    },
+    [activeProject, activeThreadRef],
+  );
+  const addClickUpSurface = useCallback(
+    (template?: DedicatedPageTemplate) => {
+      if (!activeThreadRef || !activeProject) return;
+      setDedicatedPageTemplate(template);
+      useRightPanelStore.getState().open(activeThreadRef, "clickup");
+    },
+    [activeProject, activeThreadRef],
+  );
+  const [customPageTemplate, setCustomPageTemplate] = useState<DedicatedPageTemplate | undefined>();
+  const addCustomPageSurface = useCallback(
+    (template?: DedicatedPageTemplate) => {
+      if (!activeThreadRef || !activeProject) return;
+      setCustomPageTemplate(template);
+      useRightPanelStore.getState().open(activeThreadRef, "custom");
+    },
+    [activeProject, activeThreadRef],
+  );
+  const addIssuesSurface = useCallback(() => {
+    if (!activeThreadRef || !activeProject) return;
+    useRightPanelStore.getState().open(activeThreadRef, "issues");
+  }, [activeProject, activeThreadRef]);
   const openFileSurface = useCallback(
     (relativePath: string) => {
       if (!activeThreadRef || !activeProject) return;
@@ -6128,7 +6178,7 @@ function ChatViewContent(props: ChatViewProps) {
     ) : activeRightPanelSurface?.kind === "pull-request" && !supportsPullRequests ? (
       <PullRequestsUnavailableState
         title="Pull requests unavailable"
-        error="Update this environment's T3 Code server to browse pull requests."
+        error="Update this environment's LifeOS server to browse pull requests."
       />
     ) : activeRightPanelSurface?.kind === "pull-request" ? (
       // No onClose: the surface tab's own X owns closing here, and a second X in the header
@@ -6170,6 +6220,37 @@ function ChatViewContent(props: ChatViewProps) {
         environmentId={activeThreadRef?.environmentId ?? null}
         threadId={activeThreadRef?.threadId ?? null}
       />
+    ) : activeRightPanelSurface?.kind === "documentation" && activeProject ? (
+      <DocumentationPanel environmentId={activeThread.environmentId} projectId={activeProject.id} />
+    ) : activeRightPanelSurface?.kind === "cicd" && activeProject ? (
+      <CicdPanel environmentId={activeThread.environmentId} projectId={activeProject.id} />
+    ) : activeRightPanelSurface?.kind === "notion" ? (
+      activeProject ? (
+        <NotionPagePanel
+          environmentId={activeThread.environmentId}
+          projectId={activeProject.id}
+          {...(dedicatedPageTemplate ? { initialTemplate: dedicatedPageTemplate } : {})}
+        />
+      ) : null
+    ) : activeRightPanelSurface?.kind === "clickup" ? (
+      activeProject ? (
+        <ClickUpPagePanel
+          environmentId={activeThread.environmentId}
+          projectId={activeProject.id}
+          {...(dedicatedPageTemplate ? { initialTemplate: dedicatedPageTemplate } : {})}
+        />
+      ) : null
+    ) : activeRightPanelSurface?.kind === "custom" ? (
+      activeProject ? (
+        <DedicatedPagePanel
+          kind="custom"
+          environmentId={activeThread.environmentId}
+          projectId={activeProject.id}
+          {...(customPageTemplate ? { initialTemplate: customPageTemplate } : {})}
+        />
+      ) : null
+    ) : activeRightPanelSurface?.kind === "issues" && activeProject ? (
+      <IssueListPanel environmentId={activeThread.environmentId} projectId={activeProject.id} />
     ) : (activeRightPanelSurface?.kind === "files" || activeRightPanelSurface?.kind === "file") &&
       activeProject &&
       activeWorkspaceRoot ? (
@@ -6638,14 +6719,42 @@ function ChatViewContent(props: ChatViewProps) {
           onAddTerminal={addTerminalSurface}
           onAddDiff={addDiffSurface}
           onAddFiles={addFilesSurface}
+          onAddDocumentation={addDocumentationSurface}
+          onAddCicd={addCicdSurface}
           onAddPullRequest={addPullRequestSurface}
           onAddAgents={addAgentsSurface}
+          onAddNotion={addNotionSurface}
+          onAddClickUp={addClickUpSurface}
+          onAddCustomPage={addCustomPageSurface}
+          onAddIssues={addIssuesSurface}
           browserAvailable={isPreviewSupportedInRuntime()}
           terminalAvailable={activeProject !== null}
           diffAvailable={isServerThread && isGitRepo}
           filesAvailable={activeProject !== null}
+          documentationAvailable={activeProject !== null}
+          cicdAvailable={activeProject !== null}
           pullRequestAvailable={pullRequestSurfaceAvailable}
           agentsAvailable
+          notionAvailable={
+            activeProject
+              ? readDedicatedPageConfig(activeThread.environmentId, activeProject.id, "notion") !==
+                null
+              : false
+          }
+          clickUpAvailable={
+            activeProject
+              ? readDedicatedPageConfig(activeThread.environmentId, activeProject.id, "clickup") !==
+                null
+              : false
+          }
+          dynamicPageAvailable={activeProject !== null}
+          customAvailable={
+            activeProject
+              ? readDedicatedPageConfig(activeThread.environmentId, activeProject.id, "custom") !==
+                null
+              : false
+          }
+          issuesAvailable={activeProject !== null}
           pullRequestStatuses={pullRequestTabStatuses}
           liveAgentCount={agentPanelModel.liveCount}
         >
@@ -6677,14 +6786,51 @@ function ChatViewContent(props: ChatViewProps) {
             onAddTerminal={addTerminalSurface}
             onAddDiff={addDiffSurface}
             onAddFiles={addFilesSurface}
+            onAddDocumentation={addDocumentationSurface}
+            onAddCicd={addCicdSurface}
             onAddPullRequest={addPullRequestSurface}
             onAddAgents={addAgentsSurface}
+            onAddNotion={addNotionSurface}
+            onAddClickUp={addClickUpSurface}
+            onAddCustomPage={addCustomPageSurface}
+            onAddIssues={addIssuesSurface}
             browserAvailable={isPreviewSupportedInRuntime()}
             terminalAvailable={activeProject !== null}
             diffAvailable={isServerThread && isGitRepo}
             filesAvailable={activeProject !== null}
+            documentationAvailable={activeProject !== null}
+            cicdAvailable={activeProject !== null}
             pullRequestAvailable={pullRequestSurfaceAvailable}
             agentsAvailable
+            notionAvailable={
+              activeProject
+                ? readDedicatedPageConfig(
+                    activeThread.environmentId,
+                    activeProject.id,
+                    "notion",
+                  ) !== null
+                : false
+            }
+            clickUpAvailable={
+              activeProject
+                ? readDedicatedPageConfig(
+                    activeThread.environmentId,
+                    activeProject.id,
+                    "clickup",
+                  ) !== null
+                : false
+            }
+            dynamicPageAvailable={activeProject !== null}
+            customAvailable={
+              activeProject
+                ? readDedicatedPageConfig(
+                    activeThread.environmentId,
+                    activeProject.id,
+                    "custom",
+                  ) !== null
+                : false
+            }
+            issuesAvailable={activeProject !== null}
             pullRequestStatuses={pullRequestTabStatuses}
             liveAgentCount={agentPanelModel.liveCount}
           >

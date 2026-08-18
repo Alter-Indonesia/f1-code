@@ -22,6 +22,10 @@ export class RelayConfiguration extends Context.Service<
     readonly clerkSecretKey: Redacted.Redacted<string>;
     readonly clerkPublishableKey: string;
     readonly clerkJwtAudience: string;
+    /** OIDC provider used for the replacement cloud login. */
+    readonly oidcIssuer?: string;
+    readonly oidcClientId?: string;
+    readonly oidcJwksUri?: string;
     readonly apnsDeliveryJobSigningSecret: Redacted.Redacted<string>;
     readonly cloudMintPrivateKey: Redacted.Redacted<string>;
     readonly cloudMintPublicKey: string;

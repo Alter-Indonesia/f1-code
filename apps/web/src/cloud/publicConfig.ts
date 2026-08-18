@@ -14,6 +14,9 @@ export class CloudPublicConfigMissingError extends Schema.TaggedErrorClass<Cloud
 }
 
 export interface CloudPublicConfig {
+  readonly alterOidcIssuer: string | null;
+  readonly alterOidcClientId: string | null;
+  readonly alterOidcRedirectUri: string | null;
   readonly clerkPublishableKey: string | null;
   readonly clerkJwtTemplate: string | null;
   readonly relayUrl: string | null;
@@ -39,6 +42,13 @@ function normalizeSecureUrl(value: string): string | null {
 
 export function resolveCloudPublicConfig(): CloudPublicConfig {
   return {
+    alterOidcIssuer: trimNonEmpty(import.meta.env.VITE_ALTER_OIDC_ISSUER as string | undefined),
+    alterOidcClientId: trimNonEmpty(
+      import.meta.env.VITE_ALTER_OIDC_CLIENT_ID as string | undefined,
+    ),
+    alterOidcRedirectUri: trimNonEmpty(
+      import.meta.env.VITE_ALTER_OIDC_REDIRECT_URI as string | undefined,
+    ),
     clerkPublishableKey: trimNonEmpty(
       import.meta.env.VITE_CLERK_PUBLISHABLE_KEY as string | undefined,
     ),
@@ -71,7 +81,16 @@ export function resolveRelayTracingConfig() {
 
 export function hasCloudPublicConfig(): boolean {
   const config = resolveCloudPublicConfig();
-  return Boolean(config.clerkPublishableKey && config.clerkJwtTemplate && config.relayUrl);
+  return Boolean(
+    config.relayUrl &&
+    ((config.alterOidcIssuer && config.alterOidcClientId) ||
+      (config.clerkPublishableKey && config.clerkJwtTemplate)),
+  );
+}
+
+export function hasAlterOidcConfig(): boolean {
+  const config = resolveCloudPublicConfig();
+  return Boolean(config.alterOidcIssuer && config.alterOidcClientId && config.alterOidcRedirectUri);
 }
 
 export function resolveRelayClerkTokenOptions() {

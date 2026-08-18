@@ -17,11 +17,17 @@ import { resolveStorage } from "./lib/storage";
 export const RIGHT_PANEL_KINDS = [
   "diff",
   "files",
+  "documentation",
+  "cicd",
   "file",
   "preview",
   "terminal",
   "pull-request",
   "agents",
+  "notion",
+  "clickup",
+  "issues",
+  "custom",
 ] as const;
 export type RightPanelKind = (typeof RIGHT_PANEL_KINDS)[number];
 
@@ -38,6 +44,8 @@ export type RightPanelSurface =
     }
   | { id: "diff"; kind: "diff" }
   | { id: "files"; kind: "files" }
+  | { id: "documentation"; kind: "documentation" }
+  | { id: "cicd"; kind: "cicd" }
   | {
       id: `file:${string}`;
       kind: "file";
@@ -62,7 +70,11 @@ export type RightPanelSurface =
       repository: string;
       number: number;
     }
-  | { id: "agents"; kind: "agents" };
+  | { id: "agents"; kind: "agents" }
+  | { id: "notion"; kind: "notion" }
+  | { id: "clickup"; kind: "clickup" }
+  | { id: "issues"; kind: "issues" }
+  | { id: "custom"; kind: "custom" };
 
 const RIGHT_PANEL_STORAGE_KEY = "t3code:right-panel-state:v2";
 // v9 removed the "plan" surface kind (plans render inline in the transcript).
@@ -134,8 +146,20 @@ const singletonSurface = (
       return { id: "diff", kind };
     case "files":
       return { id: "files", kind };
+    case "documentation":
+      return { id: "documentation", kind };
+    case "cicd":
+      return { id: "cicd", kind };
     case "agents":
       return { id: "agents", kind };
+    case "notion":
+      return { id: "notion", kind };
+    case "clickup":
+      return { id: "clickup", kind };
+    case "issues":
+      return { id: "issues", kind };
+    case "custom":
+      return { id: "custom", kind };
   }
 };
 

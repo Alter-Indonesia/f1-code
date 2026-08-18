@@ -94,6 +94,13 @@ import {
   PullRequestUpdateInput,
 } from "./pullRequest.ts";
 import {
+  IssueCommentInput,
+  IssueDetail,
+  IssueListInput,
+  IssueListResult,
+  IssueRef,
+} from "./issue.ts";
+import {
   RelayClientInstallFailedError,
   RelayClientInstallProgressEventSchema,
   RelayClientStatusSchema,
@@ -115,6 +122,18 @@ import {
   ProjectWriteFileInput,
   ProjectWriteFileResult,
 } from "./project.ts";
+import {
+  DocumentationDeleteInput,
+  DocumentationDeleteResult,
+  DocumentationError,
+  DocumentationListInput,
+  DocumentationListResult,
+  DocumentationReadInput,
+  DocumentationReadResult,
+  DocumentationUploadInput,
+  DocumentationWriteInput,
+  DocumentationWriteResult,
+} from "./documentation.ts";
 import {
   TerminalAttachInput,
   TerminalAttachStreamEvent,
@@ -192,6 +211,16 @@ import {
   SourceControlRepositoryLookupInput,
 } from "./sourceControl.ts";
 import { VcsError } from "./vcs.ts";
+import {
+  CicdConnectionCreateInput,
+  CicdConnectionDeleteInput,
+  CicdConnectionListInput,
+  CicdConnectionListResult,
+  CicdError,
+  CicdProjectConnectionInput,
+  CicdProjectConnectionResult,
+  CicdProjectConnectionSetInput,
+} from "./cicd.ts";
 
 export const WS_METHODS = {
   // Project registry methods
@@ -203,6 +232,16 @@ export const WS_METHODS = {
   projectsSearchContents: "projects.searchContents",
   projectsSearchEntries: "projects.searchEntries",
   projectsWriteFile: "projects.writeFile",
+  documentationList: "documentation.list",
+  documentationRead: "documentation.read",
+  documentationWrite: "documentation.write",
+  documentationUpload: "documentation.upload",
+  documentationDelete: "documentation.delete",
+  cicdConnectionsList: "cicd.connections.list",
+  cicdConnectionsCreate: "cicd.connections.create",
+  cicdConnectionsDelete: "cicd.connections.delete",
+  cicdProjectConnectionGet: "cicd.projectConnection.get",
+  cicdProjectConnectionSet: "cicd.projectConnection.set",
 
   // Shell methods
   shellOpenInEditor: "shell.openInEditor",
@@ -296,6 +335,9 @@ export const WS_METHODS = {
   pullRequestsInvalidate: "pullRequests.invalidate",
   pullRequestsReviewerCandidates: "pullRequests.reviewerCandidates",
   pullRequestsRequestReviewers: "pullRequests.requestReviewers",
+  issuesList: "issues.list",
+  issuesDetail: "issues.detail",
+  issuesComment: "issues.comment",
 
   // Source control methods
   sourceControlLookupRepository: "sourceControl.lookupRepository",
@@ -482,6 +524,27 @@ export const WsPullRequestsListRpc = Rpc.make(WS_METHODS.pullRequestsList, {
   error: PullRequestRpcError,
 });
 
+const IssueRpcError = Schema.Union([
+  PullRequestUnavailableError,
+  PullRequestOperationError,
+  EnvironmentAuthorizationError,
+]);
+export const WsIssuesListRpc = Rpc.make(WS_METHODS.issuesList, {
+  payload: IssueListInput,
+  success: IssueListResult,
+  error: IssueRpcError,
+});
+export const WsIssuesDetailRpc = Rpc.make(WS_METHODS.issuesDetail, {
+  payload: IssueRef,
+  success: IssueDetail,
+  error: IssueRpcError,
+});
+export const WsIssuesCommentRpc = Rpc.make(WS_METHODS.issuesComment, {
+  payload: IssueCommentInput,
+  success: Schema.Void,
+  error: IssueRpcError,
+});
+
 /**
  * The line counts for rows already on the page. Its own call because on GitHub the pair costs
  * 40-60% of the listing read that answers everything else on the row, so the rows arrive first
@@ -646,6 +709,62 @@ export const WsProjectsWriteFileRpc = Rpc.make(WS_METHODS.projectsWriteFile, {
   payload: ProjectWriteFileInput,
   success: ProjectWriteFileResult,
   error: Schema.Union([ProjectWriteFileError, EnvironmentAuthorizationError]),
+});
+
+export const WsDocumentationListRpc = Rpc.make(WS_METHODS.documentationList, {
+  payload: DocumentationListInput,
+  success: DocumentationListResult,
+  error: Schema.Union([DocumentationError, EnvironmentAuthorizationError]),
+});
+
+export const WsDocumentationReadRpc = Rpc.make(WS_METHODS.documentationRead, {
+  payload: DocumentationReadInput,
+  success: DocumentationReadResult,
+  error: Schema.Union([DocumentationError, EnvironmentAuthorizationError]),
+});
+
+export const WsDocumentationWriteRpc = Rpc.make(WS_METHODS.documentationWrite, {
+  payload: DocumentationWriteInput,
+  success: DocumentationWriteResult,
+  error: Schema.Union([DocumentationError, EnvironmentAuthorizationError]),
+});
+
+export const WsDocumentationUploadRpc = Rpc.make(WS_METHODS.documentationUpload, {
+  payload: DocumentationUploadInput,
+  success: DocumentationWriteResult,
+  error: Schema.Union([DocumentationError, EnvironmentAuthorizationError]),
+});
+
+export const WsDocumentationDeleteRpc = Rpc.make(WS_METHODS.documentationDelete, {
+  payload: DocumentationDeleteInput,
+  success: DocumentationDeleteResult,
+  error: Schema.Union([DocumentationError, EnvironmentAuthorizationError]),
+});
+
+export const WsCicdConnectionsListRpc = Rpc.make(WS_METHODS.cicdConnectionsList, {
+  payload: CicdConnectionListInput,
+  success: CicdConnectionListResult,
+  error: Schema.Union([CicdError, EnvironmentAuthorizationError]),
+});
+export const WsCicdConnectionsCreateRpc = Rpc.make(WS_METHODS.cicdConnectionsCreate, {
+  payload: CicdConnectionCreateInput,
+  success: CicdConnectionListResult,
+  error: Schema.Union([CicdError, EnvironmentAuthorizationError]),
+});
+export const WsCicdConnectionsDeleteRpc = Rpc.make(WS_METHODS.cicdConnectionsDelete, {
+  payload: CicdConnectionDeleteInput,
+  success: CicdConnectionListResult,
+  error: Schema.Union([CicdError, EnvironmentAuthorizationError]),
+});
+export const WsCicdProjectConnectionGetRpc = Rpc.make(WS_METHODS.cicdProjectConnectionGet, {
+  payload: CicdProjectConnectionInput,
+  success: CicdProjectConnectionResult,
+  error: Schema.Union([CicdError, EnvironmentAuthorizationError]),
+});
+export const WsCicdProjectConnectionSetRpc = Rpc.make(WS_METHODS.cicdProjectConnectionSet, {
+  payload: CicdProjectConnectionSetInput,
+  success: CicdProjectConnectionResult,
+  error: Schema.Union([CicdError, EnvironmentAuthorizationError]),
 });
 
 export const WsShellOpenInEditorRpc = Rpc.make(WS_METHODS.shellOpenInEditor, {
@@ -1007,6 +1126,9 @@ export const WsRpcGroup = RpcGroup.make(
   WsCloudGetRelayClientStatusRpc,
   WsCloudInstallRelayClientRpc,
   WsPullRequestsListRpc,
+  WsIssuesListRpc,
+  WsIssuesDetailRpc,
+  WsIssuesCommentRpc,
   WsPullRequestsListStatsRpc,
   WsPullRequestsDetailRpc,
   WsPullRequestsActivityRpc,
@@ -1031,6 +1153,16 @@ export const WsRpcGroup = RpcGroup.make(
   WsProjectsSearchContentsRpc,
   WsProjectsSearchEntriesRpc,
   WsProjectsWriteFileRpc,
+  WsDocumentationListRpc,
+  WsDocumentationReadRpc,
+  WsDocumentationWriteRpc,
+  WsDocumentationUploadRpc,
+  WsDocumentationDeleteRpc,
+  WsCicdConnectionsListRpc,
+  WsCicdConnectionsCreateRpc,
+  WsCicdConnectionsDeleteRpc,
+  WsCicdProjectConnectionGetRpc,
+  WsCicdProjectConnectionSetRpc,
   WsShellOpenInEditorRpc,
   WsFilesystemBrowseRpc,
   WsAssetsCreateUrlRpc,

@@ -79,7 +79,7 @@ import {
   useVcsInitAction,
   useVcsPullAction,
 } from "~/lib/sourceControlActions";
-import { useThread } from "~/state/entities";
+import { useProjects, useThread } from "~/state/entities";
 import { useEnvironmentQuery } from "~/state/query";
 import { serverEnvironment } from "~/state/server";
 import { sourceControlEnvironment } from "~/state/sourceControl";
@@ -161,6 +161,23 @@ function requestVcsStatusRefresh(
   void refresh({ environmentId, input: { cwd } });
 }
 const RUNNING_SOURCE_CONTROL_ACTIONS = ["runStackedAction", "pull", "publishRepository"] as const;
+
+function repositoryWebUrl(remoteUrl: string | null | undefined): string | null {
+  const remote = remoteUrl?.trim() ?? "";
+  if (remote.length === 0) return null;
+  if (/^https?:\/\//i.test(remote)) {
+    return remote.replace(/\.git\/?$/i, "");
+  }
+  const sshUrl = /^ssh:\/\/[^@]+@([^/]+)\/(.+)$/i.exec(remote);
+  if (sshUrl?.[1] && sshUrl[2]) {
+    return `https://${sshUrl[1]}/${sshUrl[2].replace(/\.git\/?$/i, "")}`;
+  }
+  const scpUrl = /^(?:[^@]+@)?([^:]+):(.+)$/.exec(remote);
+  if (scpUrl?.[1] && scpUrl[2]) {
+    return `https://${scpUrl[1]}/${scpUrl[2].replace(/\.git\/?$/i, "")}`;
+  }
+  return null;
+}
 
 const PUBLISH_PROVIDER_OPTIONS = [
   {
@@ -1005,6 +1022,12 @@ export default function GitActionsControl({
   const activeServerThread = useThread(activeThreadRef, {
     waitForShell: activeDraftThread !== null,
   });
+  const projects = useProjects();
+  const activeProject = projects.find(
+    (project) =>
+      project.environmentId === activeEnvironmentId &&
+      project.id === (activeServerThread?.projectId ?? activeDraftThread?.projectId),
+  );
   const setDraftThreadContext = useComposerDraftStore((store) => store.setDraftThreadContext);
   const [isCommitDialogOpen, setIsCommitDialogOpen] = useState(false);
   const [dialogCommitMessage, setDialogCommitMessage] = useState("");
@@ -1259,6 +1282,29 @@ export default function GitActionsControl({
       );
     });
   }, [gitStatusForActions, onOpenPullRequest, threadToastData]);
+
+  const openRepository = useCallback(() => {
+    const url = repositoryWebUrl(activeProject?.repositoryIdentity?.locator.remoteUrl);
+    const api = readLocalApi();
+    if (!url || !api) {
+      toastManager.add({
+        type: "error",
+        title: "Repository link is unavailable.",
+        data: threadToastData,
+      });
+      return;
+    }
+    void api.shell.openExternal(url).catch((error: unknown) => {
+      toastManager.add(
+        stackedThreadToast({
+          type: "error",
+          title: "Unable to open repository",
+          description: error instanceof Error ? error.message : "An error occurred.",
+          ...(threadToastData !== undefined ? { data: threadToastData } : {}),
+        }),
+      );
+    });
+  }, [activeProject?.repositoryIdentity?.locator.remoteUrl, threadToastData]);
 
   runGitActionWithToast = useEffectEvent(
     async ({
@@ -1667,6 +1713,7 @@ export default function GitActionsControl({
   );
 
   const canPublishRepository = isRepo && gitStatusForActions !== null && !hasPrimaryRemote;
+  const repositoryUrl = repositoryWebUrl(activeProject?.repositoryIdentity?.locator.remoteUrl);
 
   if (!gitCwd) return null;
 
@@ -1810,6 +1857,13 @@ export default function GitActionsControl({
                   Publish repository...
                 </MenuItem>
               ) : null}
+              <MenuItem
+                disabled={isGitActionRunning || repositoryUrl === null}
+                onClick={openRepository}
+              >
+                <ExternalLinkIcon />
+                Open repo
+              </MenuItem>
               {gitStatusForActions?.refName === null && (
                 <p className="px-2 py-1.5 text-xs text-warning">
                   Detached HEAD: create and checkout a refName to enable push and pull request

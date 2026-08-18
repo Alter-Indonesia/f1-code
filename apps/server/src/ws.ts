@@ -57,6 +57,8 @@ import {
   type TerminalMetadataStreamEvent,
   WS_METHODS,
   WsRpcGroup,
+  PullRequestUnavailableError,
+  CicdError,
 } from "@t3tools/contracts";
 import { resolveServerBackgroundActivitySettings } from "@t3tools/shared/backgroundActivitySettings";
 import { HttpRouter, HttpServerRequest, HttpServerRespondable } from "effect/unstable/http";
@@ -64,6 +66,8 @@ import { RpcSerialization, RpcServer } from "effect/unstable/rpc";
 
 import * as CheckpointDiffQuery from "./checkpointing/CheckpointDiffQuery.ts";
 import * as ServerConfig from "./config.ts";
+import * as DocumentationStore from "./documentation/DocumentationStore.ts";
+import * as CicdConnectionStore from "./cicd/CicdConnectionStore.ts";
 import * as Keybindings from "./keybindings.ts";
 import * as ExternalLauncher from "./process/externalLauncher.ts";
 import {
@@ -98,6 +102,7 @@ import * as VcsProvisioningService from "./vcs/VcsProvisioningService.ts";
 import * as GitWorkflowService from "./git/GitWorkflowService.ts";
 import * as ReviewService from "./review/ReviewService.ts";
 import * as ProjectSetupScriptRunner from "./project/ProjectSetupScriptRunner.ts";
+import * as IssueService from "./issue/IssueService.ts";
 import * as ServerEnvironment from "./environment/ServerEnvironment.ts";
 import * as RemoteOpenTargets from "./environment/RemoteOpenTargets.ts";
 import * as BackgroundPolicy from "./background/BackgroundPolicy.ts";
@@ -379,6 +384,8 @@ const makeWsRpcLayer = (
       const startup = yield* ServerRuntimeStartup.ServerRuntimeStartup;
       const workspaceEntries = yield* WorkspaceEntries.WorkspaceEntries;
       const workspaceFileSystem = yield* WorkspaceFileSystem.WorkspaceFileSystem;
+      const documentation = yield* DocumentationStore.make;
+      const cicdConnections = yield* CicdConnectionStore.make;
       const projectSetupScriptRunner = yield* ProjectSetupScriptRunner.ProjectSetupScriptRunner;
       const serverEnvironment = yield* ServerEnvironment.ServerEnvironment;
       const backgroundPolicy = yield* BackgroundPolicy.BackgroundPolicy;
@@ -412,6 +419,7 @@ const makeWsRpcLayer = (
       const sourceControlRepositories =
         yield* SourceControlRepositoryService.SourceControlRepositoryService;
       const pullRequests = yield* PullRequestService.PullRequestService;
+      const issues = yield* IssueService.IssueService;
       const bootstrapCredentials = yield* PairingGrantStore.PairingGrantStore;
       const sessions = yield* SessionStore.SessionStore;
       const processDiagnostics = yield* ProcessDiagnostics.ProcessDiagnostics;
@@ -1647,6 +1655,18 @@ const makeWsRpcLayer = (
           observeRpcEffect(WS_METHODS.pullRequestsList, pullRequests.list(input), {
             "rpc.aggregate": "pull-requests",
           }),
+        [WS_METHODS.issuesList]: (input) =>
+          observeRpcEffect(WS_METHODS.issuesList, issues.list(input), {
+            "rpc.aggregate": "issues",
+          }),
+        [WS_METHODS.issuesDetail]: (input) =>
+          observeRpcEffect(WS_METHODS.issuesDetail, issues.detail(input), {
+            "rpc.aggregate": "issues",
+          }),
+        [WS_METHODS.issuesComment]: (input) =>
+          observeRpcEffect(WS_METHODS.issuesComment, issues.comment(input), {
+            "rpc.aggregate": "issues",
+          }),
         [WS_METHODS.pullRequestsListStats]: (input) =>
           observeRpcEffect(WS_METHODS.pullRequestsListStats, pullRequests.listStats(input), {
             "rpc.aggregate": "pull-requests",
@@ -1831,6 +1851,81 @@ const makeWsRpcLayer = (
                     ...projectFileFailureContext(cause),
                     cause,
                   }),
+              ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
+        [WS_METHODS.documentationList]: (input) =>
+          observeRpcEffect(WS_METHODS.documentationList, documentation.list(input.projectId), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.documentationRead]: (input) =>
+          observeRpcEffect(WS_METHODS.documentationRead, documentation.read(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.documentationWrite]: (input) =>
+          observeRpcEffect(WS_METHODS.documentationWrite, documentation.write(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.documentationUpload]: (input) =>
+          observeRpcEffect(WS_METHODS.documentationUpload, documentation.upload(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.documentationDelete]: (input) =>
+          observeRpcEffect(WS_METHODS.documentationDelete, documentation.remove(input), {
+            "rpc.aggregate": "workspace",
+          }),
+        [WS_METHODS.cicdConnectionsList]: () =>
+          observeRpcEffect(
+            WS_METHODS.cicdConnectionsList,
+            cicdConnections.list.pipe(
+              Effect.map((connections) => ({ connections })),
+              Effect.mapError(
+                (cause) => new CicdError({ operation: "list", message: cause.message }),
+              ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
+        [WS_METHODS.cicdConnectionsCreate]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.cicdConnectionsCreate,
+            cicdConnections.create(input).pipe(
+              Effect.map((connections) => ({ connections })),
+              Effect.mapError(
+                (cause) => new CicdError({ operation: "create", message: cause.message }),
+              ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
+        [WS_METHODS.cicdConnectionsDelete]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.cicdConnectionsDelete,
+            cicdConnections.remove(input.id).pipe(
+              Effect.map((connections) => ({ connections })),
+              Effect.mapError(
+                (cause) => new CicdError({ operation: "delete", message: cause.message }),
+              ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
+        [WS_METHODS.cicdProjectConnectionGet]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.cicdProjectConnectionGet,
+            cicdConnections.getProject(input.projectId).pipe(
+              Effect.map((connectionId) => ({ connectionId })),
+              Effect.mapError(
+                (cause) => new CicdError({ operation: "get-project", message: cause.message }),
+              ),
+            ),
+            { "rpc.aggregate": "workspace" },
+          ),
+        [WS_METHODS.cicdProjectConnectionSet]: (input) =>
+          observeRpcEffect(
+            WS_METHODS.cicdProjectConnectionSet,
+            cicdConnections.setProject(input.projectId, input.connectionId).pipe(
+              Effect.map((connectionId) => ({ connectionId })),
+              Effect.mapError(
+                (cause) => new CicdError({ operation: "set-project", message: cause.message }),
               ),
             ),
             { "rpc.aggregate": "workspace" },
@@ -2303,6 +2398,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
     const previewAutomationBroker = yield* PreviewAutomationBroker.PreviewAutomationBroker;
     const serverSelfUpdate = yield* ServerSelfUpdate.ServerSelfUpdate;
     const pullRequests = yield* PullRequestService.PullRequestService;
+    const issues = yield* IssueService.IssueService;
     return HttpRouter.add(
       "GET",
       "/ws",
@@ -2329,6 +2425,7 @@ export const websocketRpcRouteLayer = Layer.unwrap(
               // One server-lifetime service means clients share the same PR caches, and a WS
               // mutation invalidates the HTTP diff cache that every client reads from.
               Layer.provide(Layer.succeed(PullRequestService.PullRequestService, pullRequests)),
+              Layer.provide(Layer.succeed(IssueService.IssueService, issues)),
               Layer.provide(
                 SourceControlDiscovery.layer.pipe(
                   Layer.provide(

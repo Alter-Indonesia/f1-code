@@ -1,18 +1,15 @@
-import { useAuth, useClerk, useUser } from "@clerk/react";
+import { useUser } from "@clerk/react";
 import { encodeConnectAuthCode, readConnectAuthorizeRequest } from "@t3tools/shared/connectAuth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
 import {
   buildConnectCliClerkAuthorizeUrl,
-  connectCliSignInRedirectUrl,
   readConnectCliAuthState,
   readConnectCliCallbackResult,
   rememberConnectCliAuthState,
 } from "../../cloud/connectCliAuth";
-import { isElectron } from "../../env";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
 import { AuthSurfaceShell } from "../auth/AuthSurfaceShell";
-import { resolveClerkSignInProps } from "../clerk/authRedirect";
 import { Button } from "../ui/button";
 
 function ConnectCliAuthMessage({
@@ -52,35 +49,18 @@ const invalidLinkMessage = {
  */
 export function ConnectCliAuthorizeSurface() {
   const [request] = useState(() => readConnectAuthorizeRequest(new URL(window.location.href)));
-  const clerk = useClerk();
-  const { isLoaded, isSignedIn } = useAuth();
-  const signInOpened = useRef(false);
   const redirecting = useRef(false);
 
   const openSignIn = useCallback(() => {
     if (!request) {
       return;
     }
-    // Clerk redirects to the authorize endpoint itself once sign-in completes,
-    // so the callback's state check has to be armed before handing off.
     rememberConnectCliAuthState(request.state);
-    clerk.openSignIn(
-      resolveClerkSignInProps(
-        connectCliSignInRedirectUrl(request, window.location.href),
-        isElectron,
-      ),
-    );
-  }, [clerk, request]);
+    window.location.assign(buildConnectCliClerkAuthorizeUrl(request) ?? window.location.href);
+  }, [request]);
 
   useEffect(() => {
-    if (!request || !isLoaded || redirecting.current) {
-      return;
-    }
-    if (!isSignedIn) {
-      if (!signInOpened.current) {
-        signInOpened.current = true;
-        openSignIn();
-      }
+    if (!request || redirecting.current) {
       return;
     }
     const authorizeUrl = buildConnectCliClerkAuthorizeUrl(request);
@@ -90,7 +70,7 @@ export function ConnectCliAuthorizeSurface() {
     redirecting.current = true;
     rememberConnectCliAuthState(request.state);
     window.location.assign(authorizeUrl);
-  }, [isLoaded, isSignedIn, openSignIn, request]);
+  }, [request]);
 
   if (!request) {
     return (
@@ -108,20 +88,14 @@ export function ConnectCliAuthorizeSurface() {
             ? "Step 1 of 2 · Browser authorization"
             : "Browser authorization"
         }
-        title="Connecting your terminal"
-        description={
-          isSignedIn
-            ? "Redirecting to authorize T3 Connect for your CLI…"
-            : "Sign in to continue authorizing T3 Connect for your CLI."
-        }
+        title="Login dengan Alter One"
+        description="Redirecting ke Alter One untuk mengotorisasi koneksi T3 Connect…"
       />
-      {isLoaded && !isSignedIn ? (
-        <div className="mt-6">
-          <Button type="button" onClick={openSignIn}>
-            Sign in
-          </Button>
-        </div>
-      ) : null}
+      <div className="mt-6">
+        <Button type="button" onClick={openSignIn}>
+          Login dengan Alter One
+        </Button>
+      </div>
     </AuthSurfaceShell>
   );
 }

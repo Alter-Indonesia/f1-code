@@ -36,6 +36,7 @@ import {
   readPersistedServerRuntimeState,
 } from "../serverRuntimeState.ts";
 import * as WorkspacePaths from "../workspace/WorkspacePaths.ts";
+import { ensureF1Gitignore } from "../workspace/F1Gitignore.ts";
 import { type CliAuthLocationFlags, projectLocationFlags, resolveCliAuthConfig } from "./config.ts";
 
 type ProjectMutationTarget = {
@@ -475,6 +476,7 @@ const projectAddCommand = Command.make("add", {
 
         const title = yield* resolveProjectTitle(workspaceRoot, Option.getOrUndefined(flags.title));
         const projectId = ProjectId.make(yield* projectCommandUuid);
+        yield* ensureF1Gitignore(workspaceRoot).pipe(Effect.ignoreCause({ log: true }));
         yield* dispatch({
           type: "project.create",
           commandId: CommandId.make(yield* projectCommandUuid),

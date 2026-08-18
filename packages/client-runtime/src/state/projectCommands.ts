@@ -102,5 +102,72 @@ export function createProjectEnvironmentAtoms<R, E>(
           JSON.stringify([environmentId, input.cwd, input.relativePath]),
       },
     }),
+    documentationList: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:documentation:list",
+      tag: WS_METHODS.documentationList,
+      // Documentation changes from the panel itself, so a cached empty list
+      // must not hide a note immediately after it is created or uploaded.
+      staleTimeMs: 0,
+    }),
+    documentationRead: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:documentation:read",
+      tag: WS_METHODS.documentationRead,
+      staleTimeMs: 5_000,
+    }),
+    documentationWrite: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:documentation:write",
+      tag: WS_METHODS.documentationWrite,
+      scheduler: fileScheduler,
+      concurrency: {
+        mode: "serial",
+        key: ({ environmentId, input }) =>
+          JSON.stringify([environmentId, input.projectId, input.relativePath]),
+      },
+    }),
+    documentationUpload: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:documentation:upload",
+      tag: WS_METHODS.documentationUpload,
+      scheduler: fileScheduler,
+      concurrency: {
+        mode: "serial",
+        key: ({ environmentId, input }) =>
+          JSON.stringify([environmentId, input.projectId, input.relativePath]),
+      },
+    }),
+    documentationDelete: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:documentation:delete",
+      tag: WS_METHODS.documentationDelete,
+      scheduler: fileScheduler,
+      concurrency: {
+        mode: "serial",
+        key: ({ environmentId, input }) =>
+          JSON.stringify([environmentId, input.projectId, input.relativePath]),
+      },
+    }),
+    cicdConnectionsList: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:cicd:connections:list",
+      tag: WS_METHODS.cicdConnectionsList,
+      staleTimeMs: 0,
+    }),
+    cicdConnectionsCreate: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:cicd:connections:create",
+      tag: WS_METHODS.cicdConnectionsCreate,
+      scheduler: fileScheduler,
+    }),
+    cicdConnectionsDelete: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:cicd:connections:delete",
+      tag: WS_METHODS.cicdConnectionsDelete,
+      scheduler: fileScheduler,
+    }),
+    cicdProjectConnectionGet: createEnvironmentRpcQueryAtomFamily(runtime, {
+      label: "environment-data:cicd:project-connection:get",
+      tag: WS_METHODS.cicdProjectConnectionGet,
+      staleTimeMs: 0,
+    }),
+    cicdProjectConnectionSet: createEnvironmentRpcCommand(runtime, {
+      label: "environment-data:cicd:project-connection:set",
+      tag: WS_METHODS.cicdProjectConnectionSet,
+      scheduler: fileScheduler,
+    }),
   };
 }

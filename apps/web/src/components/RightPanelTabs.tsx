@@ -2,12 +2,17 @@ import type { ContextMenuItem, PreviewSessionSnapshot, PullRequestState } from "
 import { getTerminalLabel } from "@t3tools/shared/terminalLabels";
 import {
   Bot,
+  CircleDot as CircleDotIcon,
+  Activity,
   FileDiff,
+  FileText,
   Files,
   GitPullRequest,
   Globe2,
   Plus,
   TerminalSquare,
+  ListTodo as ListTodoIcon,
+  PanelsTopLeft,
   X,
 } from "lucide-react";
 import {
@@ -24,9 +29,19 @@ import {
 import { isElectron } from "~/env";
 import type { DesktopPreviewOverlay } from "~/previewStateStore";
 import type { RightPanelSurface } from "~/rightPanelStore";
+import type { DedicatedPageTemplate } from "./dedicated/DedicatedPagePanel";
 import { cn } from "~/lib/utils";
 import { readLocalApi } from "~/localApi";
 import { Button } from "~/components/ui/button";
+import {
+  Dialog,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogPanel,
+  DialogPopup,
+  DialogTitle,
+} from "~/components/ui/dialog";
 import { Tooltip, TooltipPopup, TooltipTrigger } from "~/components/ui/tooltip";
 import { Kbd } from "~/components/ui/kbd";
 import { Menu, MenuItem, MenuPopup, MenuTrigger } from "~/components/ui/menu";
@@ -63,14 +78,28 @@ interface RightPanelTabsProps {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  onAddDocumentation?: () => void;
+  onAddCicd?: () => void;
   onAddPullRequest: () => void;
   onAddAgents: () => void;
+  onAddNotion?: (template?: DedicatedPageTemplate) => void;
+  onAddClickUp?: (template?: DedicatedPageTemplate) => void;
+  onAddIssues?: () => void;
+  onAddDynamicPage?: () => void;
+  onAddCustomPage?: (template?: DedicatedPageTemplate) => void;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
+  documentationAvailable?: boolean;
+  cicdAvailable?: boolean;
   pullRequestAvailable: boolean;
   agentsAvailable: boolean;
+  notionAvailable?: boolean;
+  clickUpAvailable?: boolean;
+  issuesAvailable?: boolean;
+  dynamicPageAvailable?: boolean;
+  customAvailable?: boolean;
   pullRequestStatuses?: Readonly<Record<string, PullRequestTabStatus>>;
   /** Running + waiting subagents; badges the Agents card in the empty state. */
   liveAgentCount: number;
@@ -86,12 +115,15 @@ export interface PullRequestTabStatus {
 }
 
 const SURFACE_DISABLED_REASONS = {
-  browser: "Browser previews are only available in the T3 Code desktop app.",
+  browser: "Browser previews are only available in the LifeOS desktop app.",
   terminal: "Terminal surfaces are only available from a project thread.",
   files: "Files are only available when a project is open.",
+  documentation: "Documentation is only available when a project is open.",
+  cicd: "CI/CD is only available when a project is open.",
   diff: "Diff is only available for server threads in Git repositories.",
   pullRequest: "This thread's branch has no pull request yet.",
   agents: "Agents are only available from a thread.",
+  issues: "Issues are available when a project is open.",
 } as const;
 
 /** Overlays that must win over the launcher's letter shortcuts. */
@@ -111,9 +143,12 @@ const SURFACE_UNAVAILABLE_HINTS = {
   browser: "Only available in the desktop app.",
   terminal: "Available when a project is open.",
   files: "Available when a project is open.",
+  documentation: "Available when a project is open.",
+  cicd: "Available when a project is open.",
   diff: "Available for Git repositories.",
   pullRequest: "No pull request on this branch yet.",
   agents: "Available from a thread.",
+  issues: "Available when a project is open.",
 } as const;
 
 type TabContextMenuAction = "copy-path" | "close" | "close-others" | "close-to-right" | "close-all";
@@ -158,14 +193,28 @@ function RightPanelEmptyState(props: {
   onAddTerminal: () => void;
   onAddDiff: () => void;
   onAddFiles: () => void;
+  onAddDocumentation: () => void;
+  onAddCicd: () => void;
   onAddPullRequest: () => void;
   onAddAgents: () => void;
+  onAddNotion: ((template?: DedicatedPageTemplate) => void) | undefined;
+  onAddClickUp: ((template?: DedicatedPageTemplate) => void) | undefined;
+  onAddIssues: (() => void) | undefined;
+  onAddDynamicPage: (() => void) | undefined;
+  onAddCustomPage: ((template?: DedicatedPageTemplate) => void) | undefined;
   browserAvailable: boolean;
   terminalAvailable: boolean;
   diffAvailable: boolean;
   filesAvailable: boolean;
+  documentationAvailable: boolean;
+  cicdAvailable: boolean;
   pullRequestAvailable: boolean;
   agentsAvailable: boolean;
+  notionAvailable: boolean | undefined;
+  clickUpAvailable: boolean | undefined;
+  issuesAvailable: boolean | undefined;
+  dynamicPageAvailable: boolean | undefined;
+  customAvailable: boolean | undefined;
   liveAgentCount: number;
 }) {
   // -1 means no highlight: it only appears on hover or arrow use.
@@ -203,6 +252,26 @@ function RightPanelEmptyState(props: {
       badgeCount: 0,
     },
     {
+      label: "Documentation",
+      description: "Store private notes and project files.",
+      icon: FileText,
+      shortcut: "O",
+      available: props.documentationAvailable ?? false,
+      disabledReason: SURFACE_UNAVAILABLE_HINTS.documentation,
+      onClick: props.onAddDocumentation ?? (() => undefined),
+      badgeCount: 0,
+    },
+    {
+      label: "CI/CD",
+      description: "Manage reusable deployment connections.",
+      icon: Activity,
+      shortcut: "C",
+      available: props.cicdAvailable,
+      disabledReason: SURFACE_UNAVAILABLE_HINTS.cicd,
+      onClick: props.onAddCicd,
+      badgeCount: 0,
+    },
+    {
       label: "Diff",
       description: "Review changes in this thread.",
       icon: FileDiff,
@@ -232,7 +301,60 @@ function RightPanelEmptyState(props: {
       onClick: props.onAddAgents,
       badgeCount: props.liveAgentCount,
     },
-  ] as const;
+    {
+      label: "Dynamic Page",
+      description: "Add a Notion, ClickUp, or custom page.",
+      icon: PanelsTopLeft,
+      shortcut: "Y",
+      available: props.dynamicPageAvailable ?? false,
+      disabledReason: "Dynamic pages are available when a project is open.",
+      onClick: props.onAddDynamicPage ?? (() => undefined),
+      badgeCount: 0,
+    },
+    {
+      label: "Notion",
+      description: "Open this project's Notion page.",
+      icon: Globe2,
+      shortcut: "N",
+      available: props.notionAvailable ?? false,
+      disabledReason: "Notion is available when a project is open.",
+      onClick: () => props.onAddNotion?.(),
+      badgeCount: 0,
+    },
+    {
+      label: "ClickUp",
+      description: "Open this project's task list.",
+      icon: ListTodoIcon,
+      shortcut: "C",
+      available: props.clickUpAvailable ?? false,
+      disabledReason: "ClickUp is available when a project is open.",
+      onClick: () => props.onAddClickUp?.(),
+      badgeCount: 0,
+    },
+    {
+      label: "Custom page",
+      description: "Open a saved custom project page.",
+      icon: PanelsTopLeft,
+      shortcut: "U",
+      available: props.customAvailable ?? false,
+      disabledReason: "Custom pages are available after setup.",
+      onClick: () => props.onAddCustomPage?.(),
+      badgeCount: 0,
+    },
+    {
+      label: "Issues",
+      description: "Browse repository issues.",
+      icon: CircleDotIcon,
+      shortcut: "I",
+      available: props.issuesAvailable ?? false,
+      disabledReason: "Issues are available when a project is open.",
+      onClick: props.onAddIssues ?? (() => undefined),
+      badgeCount: 0,
+    },
+  ].filter(
+    (action) =>
+      action.label !== "Notion" && action.label !== "ClickUp" && action.label !== "Custom page",
+  );
 
   type SurfaceAction = (typeof actions)[number];
 
@@ -415,6 +537,18 @@ function surfaceTitle(
       return "Diff";
     case "files":
       return "Files";
+    case "documentation":
+      return "Documentation";
+    case "cicd":
+      return "CI/CD";
+    case "notion":
+      return "Notion";
+    case "clickup":
+      return "ClickUp";
+    case "custom":
+      return "Custom page";
+    case "issues":
+      return "Issues";
     case "file":
       return surface.relativePath.slice(surface.relativePath.lastIndexOf("/") + 1);
     case "terminal":
@@ -484,6 +618,10 @@ function SurfaceIcon({
       return <FileDiff className="size-3 shrink-0" />;
     case "files":
       return <Files className="size-3 shrink-0" />;
+    case "documentation":
+      return <FileText className="size-3 shrink-0" />;
+    case "cicd":
+      return <Activity className="size-3 shrink-0" />;
     case "file":
       return (
         <PierreEntryIcon
@@ -511,6 +649,14 @@ function SurfaceIcon({
     }
     case "agents":
       return <Bot className="size-3 shrink-0" />;
+    case "notion":
+      return <Globe2 className="size-3 shrink-0" />;
+    case "clickup":
+      return <ListTodoIcon className="size-3 shrink-0" />;
+    case "issues":
+      return <CircleDotIcon className="size-3 shrink-0" />;
+    case "custom":
+      return <PanelsTopLeft className="size-3 shrink-0" />;
   }
 }
 
@@ -518,6 +664,17 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   const ownsDesktopTitleBar = isElectron && props.mode === "inline";
   const { resolvedTheme } = useTheme();
   const tabListRef = useRef<HTMLDivElement>(null);
+  const [dynamicPageDialogOpen, setDynamicPageDialogOpen] = useState(false);
+  const openDynamicPageDialog = useCallback(() => setDynamicPageDialogOpen(true), []);
+  const chooseDynamicPage = useCallback(
+    (kind: "notion" | "clickup" | "custom", template?: DedicatedPageTemplate) => {
+      setDynamicPageDialogOpen(false);
+      if (kind === "notion") props.onAddNotion?.(template);
+      else if (kind === "clickup") props.onAddClickUp?.(template);
+      else props.onAddCustomPage?.(template);
+    },
+    [props],
+  );
 
   const handleTabContextMenu = useCallback(
     async (event: ReactMouseEvent, surface: RightPanelSurface) => {
@@ -596,181 +753,305 @@ export function RightPanelTabs(props: RightPanelTabsProps) {
   }, [props.activeSurfaceId]);
 
   return (
-    <PreviewPanelShell
-      mode={props.mode}
-      {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
-      {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
-      {...(props.defaultWidth !== undefined ? { defaultWidth: props.defaultWidth } : {})}
-    >
-      <div
-        className={cn(
-          "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 pl-2",
-          // The sheet overlays from the viewport top, so its tab bar keeps
-          // the titlebar's height: a compact row re-centers the layout
-          // controls a few pixels higher and the cluster jumps on open.
-          props.mode === "inline" && !props.layoutControls ? "pr-28" : "pr-3",
-          ownsDesktopTitleBar && "wco:pr-[calc(var(--workspace-native-controls-inset)+6rem)]",
-          props.mode === "inline" && props.maximized && COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
-        )}
-        data-right-panel-tabbar
+    <>
+      <PreviewPanelShell
+        mode={props.mode}
+        {...(props.maximized !== undefined ? { maximized: props.maximized } : {})}
+        {...(props.widthStorageKey !== undefined ? { widthStorageKey: props.widthStorageKey } : {})}
+        {...(props.defaultWidth !== undefined ? { defaultWidth: props.defaultWidth } : {})}
       >
-        <ScrollArea
-          ref={tabListRef}
-          hideScrollbars
-          scrollFade
-          className={cn("min-w-0 flex-1 rounded-none", ownsDesktopTitleBar && "drag-region")}
-          data-right-panel-tab-list
+        <div
+          className={cn(
+            "flex h-[var(--workspace-topbar-height)] min-h-[var(--workspace-topbar-height)] shrink-0 items-center gap-1 pl-2",
+            // The sheet overlays from the viewport top, so its tab bar keeps
+            // the titlebar's height: a compact row re-centers the layout
+            // controls a few pixels higher and the cluster jumps on open.
+            props.mode === "inline" && !props.layoutControls ? "pr-28" : "pr-3",
+            ownsDesktopTitleBar && "wco:pr-[calc(var(--workspace-native-controls-inset)+6rem)]",
+            props.mode === "inline" && props.maximized && COLLAPSED_SIDEBAR_TITLEBAR_INSET_CLASS,
+          )}
+          data-right-panel-tabbar
         >
-          <div className="flex h-full w-max min-w-full items-center gap-1">
-            {props.surfaces.map((surface) => {
-              const active = surface.id === props.activeSurfaceId;
-              const pending = props.pendingSurfaceIds.has(surface.id);
-              const title = surfaceTitle(surface, props.previewSessions, props.terminalLabelsById);
-              return (
-                <div
-                  key={surface.id}
-                  data-active-tab={active}
-                  onMouseDown={handleTabMouseDown}
-                  onAuxClick={(event) => handleTabAuxClick(event, surface)}
-                  onContextMenu={(event) => void handleTabContextMenu(event, surface)}
-                  className={cn(
-                    "cursor-pointer group/tab flex h-6 max-w-36 shrink-0 items-center gap-0.5 rounded-md pr-2 pl-1.5 text-xs",
-                    active
-                      ? "bg-accent text-foreground"
-                      : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
-                  )}
-                >
-                  <button
-                    type="button"
-                    className="cursor-pointer group/close relative flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
-                    aria-label={`Close ${title}`}
-                    onClick={() => props.onCloseSurface(surface)}
+          <ScrollArea
+            ref={tabListRef}
+            hideScrollbars
+            scrollFade
+            className={cn("min-w-0 flex-1 rounded-none", ownsDesktopTitleBar && "drag-region")}
+            data-right-panel-tab-list
+          >
+            <div className="flex h-full w-max min-w-full items-center gap-1">
+              {props.surfaces.map((surface) => {
+                const active = surface.id === props.activeSurfaceId;
+                const pending = props.pendingSurfaceIds.has(surface.id);
+                const title = surfaceTitle(
+                  surface,
+                  props.previewSessions,
+                  props.terminalLabelsById,
+                );
+                return (
+                  <div
+                    key={surface.id}
+                    data-active-tab={active}
+                    onMouseDown={handleTabMouseDown}
+                    onAuxClick={(event) => handleTabAuxClick(event, surface)}
+                    onContextMenu={(event) => void handleTabContextMenu(event, surface)}
+                    className={cn(
+                      "cursor-pointer group/tab flex h-6 max-w-36 shrink-0 items-center gap-0.5 rounded-md pr-2 pl-1.5 text-xs",
+                      active
+                        ? "bg-accent text-foreground"
+                        : "text-muted-foreground hover:bg-accent/60 hover:text-foreground",
+                    )}
                   >
-                    <span className="relative flex size-3 items-center justify-center group-hover/tab:hidden group-focus-visible/close:hidden">
-                      <SurfaceIcon
-                        surface={surface}
-                        sessions={props.previewSessions}
-                        desktopByTabId={props.desktopByTabId}
-                        theme={resolvedTheme}
-                        pullRequestStatuses={props.pullRequestStatuses}
-                      />
-                      {pending ? (
-                        <span
-                          className="absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full bg-current"
-                          aria-hidden
+                    <button
+                      type="button"
+                      className="cursor-pointer group/close relative flex size-4 shrink-0 items-center justify-center rounded-sm hover:bg-muted"
+                      aria-label={`Close ${title}`}
+                      onClick={() => props.onCloseSurface(surface)}
+                    >
+                      <span className="relative flex size-3 items-center justify-center group-hover/tab:hidden group-focus-visible/close:hidden">
+                        <SurfaceIcon
+                          surface={surface}
+                          sessions={props.previewSessions}
+                          desktopByTabId={props.desktopByTabId}
+                          theme={resolvedTheme}
+                          pullRequestStatuses={props.pullRequestStatuses}
                         />
-                      ) : null}
-                    </span>
-                    <X className="hidden size-3 group-hover/tab:block group-focus-visible/close:block" />
-                  </button>
-                  <Tooltip>
-                    <TooltipTrigger
-                      render={
-                        <button
-                          type="button"
-                          className="cursor-pointer flex min-w-0 items-center"
-                          onClick={() => props.onActivate(surface)}
-                        >
-                          <span className="truncate">{title}</span>
-                        </button>
-                      }
-                    />
-                    <TooltipPopup>{title}</TooltipPopup>
-                  </Tooltip>
-                </div>
-              );
-            })}
-            {props.surfaces.length > 0 ? (
-              <Menu>
-                <MenuTrigger
-                  render={
-                    <Button
-                      aria-label="Add panel surface"
-                      className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
-                      size="icon-xs"
-                      variant="ghost"
-                    />
-                  }
-                >
-                  <Plus className="size-3.5" />
-                </MenuTrigger>
-                <MenuPopup align="start" side="bottom" sideOffset={6} className="min-w-44">
-                  <SurfaceMenuItem
-                    available={props.browserAvailable}
-                    disabledReason={SURFACE_DISABLED_REASONS.browser}
-                    onClick={props.onAddBrowser}
+                        {pending ? (
+                          <span
+                            className="absolute -right-0.5 -bottom-0.5 size-1.5 rounded-full bg-current"
+                            aria-hidden
+                          />
+                        ) : null}
+                      </span>
+                      <X className="hidden size-3 group-hover/tab:block group-focus-visible/close:block" />
+                    </button>
+                    <Tooltip>
+                      <TooltipTrigger
+                        render={
+                          <button
+                            type="button"
+                            className="cursor-pointer flex min-w-0 items-center"
+                            onClick={() => props.onActivate(surface)}
+                          >
+                            <span className="truncate">{title}</span>
+                          </button>
+                        }
+                      />
+                      <TooltipPopup>{title}</TooltipPopup>
+                    </Tooltip>
+                  </div>
+                );
+              })}
+              {props.surfaces.length > 0 ? (
+                <Menu>
+                  <MenuTrigger
+                    render={
+                      <Button
+                        aria-label="Add panel surface"
+                        className="size-6 shrink-0 text-muted-foreground hover:text-foreground"
+                        size="icon-xs"
+                        variant="ghost"
+                      />
+                    }
                   >
-                    <Globe2 />
-                    Browser
-                  </SurfaceMenuItem>
-                  <SurfaceMenuItem
-                    available={props.terminalAvailable}
-                    disabledReason={SURFACE_DISABLED_REASONS.terminal}
-                    onClick={props.onAddTerminal}
-                  >
-                    <TerminalSquare />
-                    Terminal
-                  </SurfaceMenuItem>
-                  <SurfaceMenuItem
-                    available={props.filesAvailable}
-                    disabledReason={SURFACE_DISABLED_REASONS.files}
-                    onClick={props.onAddFiles}
-                  >
-                    <Files />
-                    Files
-                  </SurfaceMenuItem>
-                  <SurfaceMenuItem
-                    available={props.diffAvailable}
-                    disabledReason={SURFACE_DISABLED_REASONS.diff}
-                    onClick={props.onAddDiff}
-                  >
-                    <FileDiff />
-                    Diff
-                  </SurfaceMenuItem>
-                  <SurfaceMenuItem
-                    available={props.pullRequestAvailable}
-                    disabledReason={SURFACE_DISABLED_REASONS.pullRequest}
-                    onClick={props.onAddPullRequest}
-                  >
-                    <GitPullRequest />
-                    Pull request
-                  </SurfaceMenuItem>
-                  <SurfaceMenuItem
-                    available={props.agentsAvailable}
-                    disabledReason={SURFACE_DISABLED_REASONS.agents}
-                    onClick={props.onAddAgents}
-                  >
-                    <Bot />
-                    Agents
-                  </SurfaceMenuItem>
-                </MenuPopup>
-              </Menu>
-            ) : null}
-          </div>
-        </ScrollArea>
-        {props.layoutControls}
-      </div>
-      <div className="flex min-h-0 flex-1 flex-col" data-right-panel-surface-content>
-        {props.activeSurfaceId === null ? (
-          <RightPanelEmptyState
-            onAddBrowser={props.onAddBrowser}
-            onAddTerminal={props.onAddTerminal}
-            onAddDiff={props.onAddDiff}
-            onAddFiles={props.onAddFiles}
-            onAddPullRequest={props.onAddPullRequest}
-            onAddAgents={props.onAddAgents}
-            browserAvailable={props.browserAvailable}
-            terminalAvailable={props.terminalAvailable}
-            diffAvailable={props.diffAvailable}
-            filesAvailable={props.filesAvailable}
-            pullRequestAvailable={props.pullRequestAvailable}
-            agentsAvailable={props.agentsAvailable}
-            liveAgentCount={props.liveAgentCount}
-          />
-        ) : (
-          props.children
-        )}
-      </div>
-    </PreviewPanelShell>
+                    <Plus className="size-3.5" />
+                  </MenuTrigger>
+                  <MenuPopup align="start" side="bottom" sideOffset={6} className="min-w-44">
+                    <SurfaceMenuItem
+                      available={props.browserAvailable}
+                      disabledReason={SURFACE_DISABLED_REASONS.browser}
+                      onClick={props.onAddBrowser}
+                    >
+                      <Globe2 />
+                      Browser
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.terminalAvailable}
+                      disabledReason={SURFACE_DISABLED_REASONS.terminal}
+                      onClick={props.onAddTerminal}
+                    >
+                      <TerminalSquare />
+                      Terminal
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.filesAvailable}
+                      disabledReason={SURFACE_DISABLED_REASONS.files}
+                      onClick={props.onAddFiles}
+                    >
+                      <Files />
+                      Files
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.documentationAvailable ?? false}
+                      disabledReason={SURFACE_DISABLED_REASONS.documentation}
+                      onClick={props.onAddDocumentation ?? (() => undefined)}
+                    >
+                      <FileText />
+                      Documentation
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.cicdAvailable ?? false}
+                      disabledReason={SURFACE_DISABLED_REASONS.cicd}
+                      onClick={props.onAddCicd ?? (() => undefined)}
+                    >
+                      <Activity />
+                      CI/CD
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.diffAvailable}
+                      disabledReason={SURFACE_DISABLED_REASONS.diff}
+                      onClick={props.onAddDiff}
+                    >
+                      <FileDiff />
+                      Diff
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.pullRequestAvailable}
+                      disabledReason={SURFACE_DISABLED_REASONS.pullRequest}
+                      onClick={props.onAddPullRequest}
+                    >
+                      <GitPullRequest />
+                      Pull request
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.agentsAvailable}
+                      disabledReason={SURFACE_DISABLED_REASONS.agents}
+                      onClick={props.onAddAgents}
+                    >
+                      <Bot />
+                      Agents
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.dynamicPageAvailable ?? false}
+                      onClick={openDynamicPageDialog}
+                    >
+                      <PanelsTopLeft />
+                      Dynamic Page
+                    </SurfaceMenuItem>
+                    <SurfaceMenuItem
+                      available={props.issuesAvailable ?? false}
+                      disabledReason={SURFACE_DISABLED_REASONS.issues}
+                      onClick={props.onAddIssues ?? (() => undefined)}
+                    >
+                      <CircleDotIcon />
+                      Issues
+                    </SurfaceMenuItem>
+                  </MenuPopup>
+                </Menu>
+              ) : null}
+            </div>
+          </ScrollArea>
+          {props.layoutControls}
+        </div>
+        <div className="flex min-h-0 flex-1 flex-col" data-right-panel-surface-content>
+          {props.activeSurfaceId === null ? (
+            <RightPanelEmptyState
+              onAddBrowser={props.onAddBrowser}
+              onAddTerminal={props.onAddTerminal}
+              onAddDiff={props.onAddDiff}
+              onAddFiles={props.onAddFiles}
+              onAddDocumentation={props.onAddDocumentation ?? (() => undefined)}
+              onAddCicd={props.onAddCicd ?? (() => undefined)}
+              onAddPullRequest={props.onAddPullRequest}
+              onAddAgents={props.onAddAgents}
+              onAddNotion={props.onAddNotion}
+              onAddClickUp={props.onAddClickUp}
+              onAddIssues={props.onAddIssues}
+              onAddDynamicPage={openDynamicPageDialog}
+              onAddCustomPage={props.onAddCustomPage}
+              browserAvailable={props.browserAvailable}
+              terminalAvailable={props.terminalAvailable}
+              diffAvailable={props.diffAvailable}
+              filesAvailable={props.filesAvailable}
+              documentationAvailable={props.documentationAvailable ?? false}
+              cicdAvailable={props.cicdAvailable ?? false}
+              pullRequestAvailable={props.pullRequestAvailable}
+              agentsAvailable={props.agentsAvailable}
+              notionAvailable={props.notionAvailable}
+              clickUpAvailable={props.clickUpAvailable}
+              issuesAvailable={props.issuesAvailable}
+              dynamicPageAvailable={props.dynamicPageAvailable}
+              customAvailable={props.customAvailable}
+              liveAgentCount={props.liveAgentCount}
+            />
+          ) : (
+            props.children
+          )}
+        </div>
+      </PreviewPanelShell>
+      <Dialog open={dynamicPageDialogOpen} onOpenChange={setDynamicPageDialogOpen}>
+        <DialogPopup className="max-w-4xl">
+          <DialogHeader>
+            <DialogTitle>Add dynamic page</DialogTitle>
+            <DialogDescription>
+              Choose the page type to add for this workspace and project.
+            </DialogDescription>
+          </DialogHeader>
+          <DialogPanel className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+            {[
+              {
+                label: "Notion",
+                icon: <Globe2 className="size-8" />,
+                action: () =>
+                  chooseDynamicPage("notion", { name: "Notion", url: "https://app.notion.com" }),
+              },
+              {
+                label: "ClickUp",
+                icon: <ListTodoIcon className="size-8" />,
+                action: () =>
+                  chooseDynamicPage("clickup", { name: "ClickUp", url: "https://app.clickup.com" }),
+              },
+              {
+                label: "Trello",
+                icon: <PanelsTopLeft className="size-8" />,
+                action: () =>
+                  chooseDynamicPage("custom", { name: "Trello", url: "https://trello.com" }),
+              },
+              {
+                label: "Asana",
+                icon: <PanelsTopLeft className="size-8" />,
+                action: () =>
+                  chooseDynamicPage("custom", { name: "Asana", url: "https://app.asana.com" }),
+              },
+              {
+                label: "Gmail",
+                icon: <Globe2 className="size-8" />,
+                action: () =>
+                  chooseDynamicPage("custom", { name: "Gmail", url: "https://mail.google.com" }),
+              },
+              {
+                label: "Spreadsheet",
+                icon: <Files className="size-8" />,
+                action: () =>
+                  chooseDynamicPage("custom", {
+                    name: "Spreadsheet",
+                    url: "https://docs.google.com/spreadsheets",
+                  }),
+              },
+              {
+                label: "Custom URL",
+                icon: <PanelsTopLeft className="size-8" />,
+                action: () => chooseDynamicPage("custom"),
+              },
+            ].map((item) => (
+              <Button
+                key={item.label}
+                variant="outline"
+                className="h-32 min-h-32 w-full flex-col justify-center gap-3 text-lg"
+                onClick={item.action}
+              >
+                {item.icon}
+                <span>{item.label}</span>
+              </Button>
+            ))}
+          </DialogPanel>
+          <DialogFooter>
+            <Button variant="outline" onClick={() => setDynamicPageDialogOpen(false)}>
+              Cancel
+            </Button>
+          </DialogFooter>
+        </DialogPopup>
+      </Dialog>
+    </>
   );
 }

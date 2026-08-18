@@ -5,9 +5,8 @@ import {
   CONNECT_OAUTH_SCOPES,
   type ConnectAuthorizeRequest,
 } from "@t3tools/shared/connectAuth";
-import { clerkFrontendApiUrlFromPublishableKey } from "@t3tools/shared/relayAuth";
 
-import { configuredHostedAppUrl, isHostedStaticApp } from "../hostedPairing";
+import { configuredHostedAppUrl } from "../hostedPairing";
 import { hasCloudPublicConfig, resolveCloudPublicConfig, trimNonEmpty } from "./publicConfig";
 
 const CONNECT_CLI_AUTH_STATE_STORAGE_KEY = "t3code-connect-cli-auth-state";
@@ -17,9 +16,8 @@ export function resolveConnectCliOAuthClientId(): string | null {
 }
 
 export function hasConnectCliAuthConfig(): boolean {
-  return Boolean(
-    resolveCloudPublicConfig().clerkPublishableKey && resolveConnectCliOAuthClientId(),
-  );
+  const config = resolveCloudPublicConfig();
+  return Boolean(config.alterOidcIssuer && config.alterOidcClientId);
 }
 
 /**
@@ -28,7 +26,7 @@ export function hasConnectCliAuthConfig(): boolean {
  * Clerk CLI OAuth client configured at build time.
  */
 export function connectCliAuthRoutesEnabled(): boolean {
-  return isHostedStaticApp() && hasCloudPublicConfig() && hasConnectCliAuthConfig();
+  return hasCloudPublicConfig() && hasConnectCliAuthConfig();
 }
 
 /**
@@ -42,14 +40,13 @@ export function connectCliAuthRoutesEnabled(): boolean {
  * redirect URI allowlist either way.
  */
 export function buildConnectCliClerkAuthorizeUrl(request: ConnectAuthorizeRequest): string | null {
-  const { clerkPublishableKey } = resolveCloudPublicConfig();
-  const clientId = resolveConnectCliOAuthClientId();
-  if (!clerkPublishableKey || !clientId) {
+  const config = resolveCloudPublicConfig();
+  if (!config.alterOidcIssuer || !config.alterOidcClientId) {
     return null;
   }
   return buildConnectClerkAuthorizeUrl({
-    authorizationEndpoint: `${clerkFrontendApiUrlFromPublishableKey(clerkPublishableKey)}/oauth/authorize`,
-    clientId,
+    authorizationEndpoint: `${config.alterOidcIssuer.replace(/\/+$/u, "")}/oidc/authorize`,
+    clientId: config.alterOidcClientId,
     redirectUri:
       request.loopbackPort === undefined
         ? connectCallbackUrl(configuredHostedAppUrl())

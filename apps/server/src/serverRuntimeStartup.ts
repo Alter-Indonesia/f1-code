@@ -36,6 +36,7 @@ import * as EnvironmentAuth from "./auth/EnvironmentAuth.ts";
 import * as ProviderSessionReaper from "./provider/Services/ProviderSessionReaper.ts";
 import { forkParked } from "./serverActivation.ts";
 import * as ServiceLauncherClient from "./cloud/serviceLauncherClient.ts";
+import { ensureF1Gitignore } from "./workspace/F1Gitignore.ts";
 import {
   formatHeadlessServeOutput,
   formatHostForUrl,
@@ -199,6 +200,7 @@ export const resolveAutoBootstrapWelcomeTargets = Effect.gen(function* () {
       let nextProjectDefaultModelSelection: ModelSelection;
 
       if (Option.isNone(existingProject)) {
+        yield* ensureF1Gitignore(serverConfig.cwd).pipe(Effect.ignoreCause({ log: true }));
         const createdAt = DateTime.formatIso(yield* DateTime.now);
         nextProjectId = ProjectId.make(yield* randomUUID);
         const bootstrapProjectTitle = path.basename(serverConfig.cwd) || "project";

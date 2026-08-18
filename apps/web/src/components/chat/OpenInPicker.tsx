@@ -24,7 +24,6 @@ import {
   Icon,
   KiroIcon,
   TraeIcon,
-  VisualStudioCode,
   VisualStudioCodeInsiders,
   VSCodium,
   Zed,
@@ -54,6 +53,18 @@ type OpenInOption = {
   kind: "brand" | "generic";
 };
 
+const DashboardIcon =
+  (src: string): Icon =>
+  (props) => (
+    <img {...props} src={src} alt="" className={cn("size-3.5 object-contain", props.className)} />
+  );
+
+const VisualStudioCodeLogo = DashboardIcon("/app-icons/visual-studio-code.webp");
+const GhosttyLogo = DashboardIcon("/app-icons/ghostty.webp");
+const ITermLogo = DashboardIcon("/app-icons/iterm.webp");
+const WarpLogo = DashboardIcon("/app-icons/warp.webp");
+const WezTermLogo = DashboardIcon("/app-icons/wezterm.webp");
+
 const resolveOptions = (platform: string, availableEditors: ReadonlyArray<EditorId>) => {
   const baseOptions: ReadonlyArray<OpenInOption> = [
     {
@@ -76,7 +87,7 @@ const resolveOptions = (platform: string, availableEditors: ReadonlyArray<Editor
     },
     {
       label: "VS Code",
-      Icon: VisualStudioCode,
+      Icon: VisualStudioCodeLogo,
       value: "vscode",
       kind: "brand",
     },
@@ -90,6 +101,30 @@ const resolveOptions = (platform: string, availableEditors: ReadonlyArray<Editor
       label: "VSCodium",
       Icon: VSCodium,
       value: "vscodium",
+      kind: "brand",
+    },
+    {
+      label: "Ghostty",
+      Icon: GhosttyLogo,
+      value: "ghostty",
+      kind: "brand",
+    },
+    {
+      label: "iTerm",
+      Icon: ITermLogo,
+      value: "iterm",
+      kind: "brand",
+    },
+    {
+      label: "Warp",
+      Icon: WarpLogo,
+      value: "warp",
+      kind: "brand",
+    },
+    {
+      label: "WezTerm",
+      Icon: WezTermLogo,
+      value: "wezterm",
       kind: "brand",
     },
     {
@@ -188,6 +223,13 @@ const resolveOptions = (platform: string, availableEditors: ReadonlyArray<Editor
     },
   ];
   const availableEditorSet = new Set(availableEditors);
+  // GUI applications on macOS do not need their CLI to be installed in the
+  // server's PATH; they are launched through `open -a` by the server.
+  if (isMacPlatform(platform)) {
+    for (const editor of ["vscode", "ghostty", "iterm", "warp", "wezterm"] as const) {
+      availableEditorSet.add(editor);
+    }
+  }
   return baseOptions.filter((option) => availableEditorSet.has(option.value));
 };
 
