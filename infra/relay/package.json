@@ -6,10 +6,14 @@
     "deploy": "node -- scripts/deploy.ts",
     "destroy": "alchemy destroy",
     "test": "vp test run",
-    "typecheck": "tsgo --noEmit"
+    "typecheck": "tsgo --noEmit",
+    "selfhost:migrate": "node -- scripts/migrate.ts",
+    "selfhost:generate-secrets": "node -- scripts/generate-selfhost-secrets.ts",
+    "selfhost:start": "node -- src/server.ts"
   },
   "dependencies": {
     "@clerk/backend": "catalog:",
+    "@effect/platform-node": "catalog:",
     "@effect/sql-pg": "catalog:",
     "@noble/curves": "catalog:",
     "@noble/hashes": "catalog:",
@@ -22,7 +26,6 @@
   },
   "devDependencies": {
     "@cloudflare/workers-types": "^4.20260601.1",
-    "@effect/platform-node": "catalog:",
     "@effect/vitest": "catalog:",
     "@types/node": "catalog:",
     "drizzle-kit": "1.0.0-rc.4",

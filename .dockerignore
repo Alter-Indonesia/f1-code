@@ -1,0 +1,15 @@
+node_modules
+**/node_modules
+.git
+.env
+.env.local
+**/.env
+**/.env.local
+dist
+**/dist
+.repos
+.plans
+.vite-hooks
+apps/desktop/out
+apps/marketing/.next
+apps/mobile/.expo
