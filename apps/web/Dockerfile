@@ -16,7 +16,10 @@ FROM node:24-slim AS build
 
 # git: the workspace root `prepare` script (effect-tsgo patch, etc.) shells
 # out to git during `pnpm install` — same as infra/relay/Dockerfile.
-RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+# ca-certificates: vite-plus's Rust HTTP client can't load any root certs on
+# a bare node:24-slim otherwise ("No CA certificates were loaded from the
+# system"), which crashes `vp build`.
+RUN apt-get update && apt-get install -y --no-install-recommends git ca-certificates && rm -rf /var/lib/apt/lists/*
 RUN corepack enable && corepack prepare pnpm@11.10.0 --activate
 
 WORKDIR /repo
