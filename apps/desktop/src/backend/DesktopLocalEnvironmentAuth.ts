@@ -71,7 +71,7 @@ export const make = Effect.gen(function* () {
           httpBaseUrl: config.httpBaseUrl.href,
           credential,
           clientMetadata: {
-            label: "LifeOS Desktop",
+            label: "F1 Code Desktop",
             deviceType: "desktop",
           },
         }).pipe(

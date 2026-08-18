@@ -115,7 +115,7 @@ export interface PullRequestTabStatus {
 }
 
 const SURFACE_DISABLED_REASONS = {
-  browser: "Browser previews are only available in the LifeOS desktop app.",
+  browser: "Browser previews are only available in the F1 Code desktop app.",
   terminal: "Terminal surfaces are only available from a project thread.",
   files: "Files are only available when a project is open.",
   documentation: "Documentation is only available when a project is open.",

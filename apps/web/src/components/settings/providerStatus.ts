@@ -39,7 +39,7 @@ export function getProviderSummary(provider: ServerProvider | undefined) {
     return {
       headline: "Disabled",
       detail:
-        provider.message ?? "This provider is installed but disabled for new sessions in LifeOS.",
+        provider.message ?? "This provider is installed but disabled for new sessions in F1 Code.",
     };
   }
   if (!provider.installed) {

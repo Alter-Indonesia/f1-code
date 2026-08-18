@@ -117,7 +117,7 @@ function ChatRouteGlobalShortcuts() {
             stackedThreadToast({
               type: "info",
               title: "Preview is desktop-only",
-              description: "Open LifeOS in the desktop app to use the in-app preview.",
+              description: "Open F1 Code in the desktop app to use the in-app preview.",
             }),
           );
           return;

@@ -117,7 +117,7 @@ function clientMetadata() {
   const desktop = window.desktopBridge !== undefined;
   const platform = navigator.platform.trim();
   return {
-    label: desktop ? "LifeOS Desktop" : "LifeOS Web",
+    label: desktop ? "F1 Code Desktop" : "F1 Code Web",
     deviceType: "desktop" as const,
     ...(platform === "" ? {} : { os: platform }),
   };
