@@ -10,6 +10,10 @@
 # partial-install tricks, at the cost of a larger build context.
 FROM node:24-slim
 
+# git: the workspace root `prepare` script (effect-tsgo patch, etc.) shells
+# out to git during `pnpm install`.
+RUN apt-get update && apt-get install -y --no-install-recommends git && rm -rf /var/lib/apt/lists/*
+
 RUN corepack enable && corepack prepare pnpm@11.10.0 --activate
 
 WORKDIR /repo
