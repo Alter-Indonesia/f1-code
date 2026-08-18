@@ -1,4 +1,3 @@
-import { useAuth } from "@clerk/react";
 import { AuthAdministrativeScopes, AuthRelayWriteScope } from "@t3tools/contracts";
 import { CheckIcon } from "lucide-react";
 import { useEffect, useRef, useState } from "react";
@@ -10,6 +9,8 @@ import {
 } from "~/cloud/connectOnboarding";
 import { hasCloudPublicConfig } from "~/cloud/publicConfig";
 import { useCloudLinkController } from "~/cloud/useCloudLinkController";
+import { readAlterSession } from "~/cloud/alterSession";
+import { useSafeClerkAuth } from "~/cloud/useSafeClerkAuth";
 import { usePrimarySessionState } from "~/environments/primary";
 import { useLocalStorage } from "~/hooks/useLocalStorage";
 import { cn } from "~/lib/utils";
@@ -49,7 +50,16 @@ type OnboardingStep = "publish" | "devices";
 function ConfiguredConnectOnboardingDialog() {
   // Mirrors ManagedRelayAuthProvider: a pending Clerk session must not read as
   // signed-out, or its later activation would look like a fresh sign-in.
-  const { isLoaded, isSignedIn, userId } = useAuth({ treatPendingAsSignedOut: false });
+  const {
+    isLoaded,
+    isSignedIn: isClerkSignedIn,
+    userId: clerkUserId,
+  } = useSafeClerkAuth({
+    treatPendingAsSignedOut: false,
+  });
+  const alterSession = readAlterSession();
+  const isSignedIn = isClerkSignedIn || alterSession !== null;
+  const userId = clerkUserId ?? alterSession?.subject ?? null;
   const [optOutState, setOptOutState] = useLocalStorage(
     CONNECT_ONBOARDING_OPT_OUT_STORAGE_KEY,
     EMPTY_CONNECT_ONBOARDING_OPT_OUT_STATE,

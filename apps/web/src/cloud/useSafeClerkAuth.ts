@@ -1,4 +1,4 @@
-import { useAuth } from "@clerk/react";
+import { useAuth, useUser } from "@clerk/react";
 
 /**
  * `@clerk/react`'s `useAuth()` throws synchronously ("useAuth can only be
@@ -36,5 +36,17 @@ export function useSafeClerkAuth(...args: Parameters<typeof useAuth>): ReturnTyp
       signOut: async () => {},
       getToken: async () => null,
     } as unknown as ReturnType<typeof useAuth>;
+  }
+}
+
+/** Same rationale as {@link useSafeClerkAuth}, for `useUser()`. */
+export function useSafeClerkUser(): ReturnType<typeof useUser> {
+  try {
+    // eslint-disable-next-line react-hooks/rules-of-hooks
+    return useUser();
+  } catch {
+    return { isLoaded: true, isSignedIn: false, user: null } as unknown as ReturnType<
+      typeof useUser
+    >;
   }
 }

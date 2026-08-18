@@ -1,4 +1,3 @@
-import { useUser } from "@clerk/react";
 import { encodeConnectAuthCode, readConnectAuthorizeRequest } from "@t3tools/shared/connectAuth";
 import { useCallback, useEffect, useRef, useState } from "react";
 
@@ -9,6 +8,7 @@ import {
   rememberConnectCliAuthState,
 } from "../../cloud/connectCliAuth";
 import { useCopyToClipboard } from "../../hooks/useCopyToClipboard";
+import { useSafeClerkUser } from "../../cloud/useSafeClerkAuth";
 import { AuthSurfaceShell } from "../auth/AuthSurfaceShell";
 import { Button } from "../ui/button";
 
@@ -107,7 +107,7 @@ export function ConnectCliAuthorizeSurface() {
 export function ConnectCliCallbackSurface() {
   const [result] = useState(readConnectCliCallbackResult);
   const [expectedState] = useState(readConnectCliAuthState);
-  const { user } = useUser();
+  const { user } = useSafeClerkUser();
   const { copyToClipboard, isCopied } = useCopyToClipboard({ target: "authentication code" });
 
   if (!result) {
