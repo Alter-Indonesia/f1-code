@@ -6,6 +6,7 @@
 #     --build-arg VITE_ALTER_OIDC_ISSUER=https://one.alterindonesia.com \
 #     --build-arg VITE_ALTER_OIDC_CLIENT_ID=... \
 #     --build-arg VITE_ALTER_OIDC_REDIRECT_URI=https://f1code.alterindonesia.com/oauth/callback \
+#     --build-arg VITE_HOSTED_APP_URL=https://f1code.alterindonesia.com \
 #     -t f1code-web .
 #
 # apps/web is a plain static Vite SPA (vite.config.ts -> dist/, no SSR) — the
@@ -30,10 +31,12 @@ ARG VITE_T3CODE_RELAY_URL
 ARG VITE_ALTER_OIDC_ISSUER
 ARG VITE_ALTER_OIDC_CLIENT_ID
 ARG VITE_ALTER_OIDC_REDIRECT_URI
+ARG VITE_HOSTED_APP_URL
 ENV VITE_T3CODE_RELAY_URL=$VITE_T3CODE_RELAY_URL \
     VITE_ALTER_OIDC_ISSUER=$VITE_ALTER_OIDC_ISSUER \
     VITE_ALTER_OIDC_CLIENT_ID=$VITE_ALTER_OIDC_CLIENT_ID \
-    VITE_ALTER_OIDC_REDIRECT_URI=$VITE_ALTER_OIDC_REDIRECT_URI
+    VITE_ALTER_OIDC_REDIRECT_URI=$VITE_ALTER_OIDC_REDIRECT_URI \
+    VITE_HOSTED_APP_URL=$VITE_HOSTED_APP_URL
 
 WORKDIR /repo/apps/web
 RUN pnpm run build
