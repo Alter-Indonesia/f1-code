@@ -68,5 +68,13 @@ export const oidcTokenExchangeRoute = HttpRouter.add(
       accessToken: token.access_token,
       expiresIn: typeof token.expires_in === "number" ? token.expires_in : null,
     });
-  }).pipe(Effect.catch((cause) => errorResponse(`Token exchange failed: ${String(cause)}`, 500))),
+  }).pipe(
+    // catchCause, not just catch: this route is added via raw HttpRouter.add
+    // (not HttpApiBuilder's schema-based handling), which doesn't have
+    // automatic defect-to-500 conversion — an unexpected throw here (e.g.
+    // from the outbound fetch) would otherwise kill the connection outright
+    // instead of returning a response, showing up as a bare Cloudflare 502
+    // with no body.
+    Effect.catchCause((cause) => errorResponse(`Token exchange failed: ${cause.toString()}`, 500)),
+  ),
 );
