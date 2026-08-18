@@ -77,6 +77,7 @@ import {
   runConsumer as runLocalApnsConsumer,
 } from "./selfhost/localApnsDelivery.ts";
 import { layer as managedEndpointCloudflareLayer } from "./selfhost/managedEndpointCloudflare.ts";
+import { oidcTokenExchangeRoute } from "./selfhost/oidcTokenExchange.ts";
 import { SelfHostDeploymentConfig } from "./selfhost/deploymentConfig.ts";
 import { CloudMintKeys, ApnsDeliveryJobSigningSecret } from "./selfhost/keys.ts";
 
@@ -213,6 +214,7 @@ const relayServerLayer = Layer.unwrap(
       ),
       HttpApiScalar.layer(RelayApi, { path: "/docs" }),
       relayDocsRedirectRoute,
+      oidcTokenExchangeRoute,
       relayNotFoundRoute,
     ).pipe(
       Layer.provide([Etag.layerWeak, relayCors]),
