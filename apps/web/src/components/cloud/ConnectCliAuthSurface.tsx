@@ -89,7 +89,7 @@ export function ConnectCliAuthorizeSurface() {
             : "Browser authorization"
         }
         title="Login dengan Alter One"
-        description="Redirecting ke Alter One untuk mengotorisasi koneksi T3 Connect…"
+        description="Redirecting ke Alter One untuk mengotorisasi koneksi F1 Connect…"
       />
       <div className="mt-6">
         <Button type="button" onClick={openSignIn}>
@@ -176,7 +176,7 @@ export function ConnectCliCallbackSurface() {
 
       <p className="mt-6 text-xs leading-relaxed text-muted-foreground">
         Only enter this code in a terminal session you started yourself. Anyone holding it can link
-        their machine to your T3 Connect account while it is valid.
+        their machine to your F1 Connect account while it is valid.
       </p>
     </AuthSurfaceShell>
   );

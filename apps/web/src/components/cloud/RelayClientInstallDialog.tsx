@@ -69,8 +69,8 @@ export function RelayClientInstallDialog() {
           </DialogTitle>
           <DialogDescription>
             {isInstalling
-              ? "F1 Code is preparing this environment for secure access through T3 Connect."
-              : "F1 Code needs the relay client to make this environment available through T3 Connect."}
+              ? "F1 Code is preparing this environment for secure access through F1 Connect."
+              : "F1 Code needs the relay client to make this environment available through F1 Connect."}
           </DialogDescription>
         </DialogHeader>
         <DialogPanel scrollFade={false}>
